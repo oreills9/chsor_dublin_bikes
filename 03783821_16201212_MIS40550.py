@@ -2,7 +2,7 @@ import networkx as nx
 import requests
 import json
 import pandas as pd
-import os.path as path
+import os.path as osp
 from math import radians, cos, sin, asin, sqrt
 
 api_params = {"contract": "dublin", "apiKey": "52c182bc479e090926da33062b01aba1adc8e18c"}
@@ -16,27 +16,26 @@ def create_node_graph_from_API(contract, apiKey):
 
     return G
 
-def create_edges_for_graph(G, useRoads, cacheFile=None, apiKey=None):
-    edges = ()
-    if useRoads == True:                # Use Google Distance Matrix distance
-        if path.isFile(cacheFile):  # Call Google Distance Matrix API and store in location cache file
-            read_cached_data(G, cacheFile)
-        else:               # Use API location cache file
-            if apiKey == None:
-                print("Invalid Google Distance Matrix API key...exiting program...")
-                return
-            for n in G.nodes():
-                return
-            api_params = {"units": "metric", "travel_modes": "bicycling", "origins": origins,
-                          "destinations": calculate_destinations(G, currentNode), "apiKey": apiKey}
-            #response = requests.get("https://maps.googleapis.com/maps/api/distancematrix/json", params=api_params)
-            #distances = json.loads(response.text)
-
-    else:                               # Use straight line distance
-        if path.isFile(cacheFile):
-            read_cached_data(G, cacheFile)
-        else:
-            read_write_cached_data(G, cacheFile)
+def create_edges_for_graph(G, useRoads, cacheFile, apiKey=None):
+#    if useRoads == True:                # Use Google Distance Matrix distance
+#        if path.isFile(cacheFile):  # Call Google Distance Matrix API and store in location cache file
+#            read_cached_data(G, cacheFile)
+#        else:               # Use API location cache file
+#            if apiKey == None:
+#                print("Invalid Google Distance Matrix API key...exiting program...")
+#                return
+#            for n in G.nodes():
+#                return
+#            api_params = {"units": "metric", "travel_modes": "bicycling", "origins": origins,
+#                          "destinations": calculate_destinations(G, currentNode), "apiKey": apiKey}
+#            response = requests.get("https://maps.googleapis.com/maps/api/distancematrix/json", params=api_params)
+#            distances = json.loads(response.text)
+#
+#    else:                               # Use straight line distance
+    if osp.isfile(cacheFile):
+        read_cached_data(G, cacheFile)
+    else:
+        read_write_cached_data(G, cacheFile)
 
 def calculate_destinations(G, u):
     return 0
@@ -48,14 +47,15 @@ def read_cached_data(G, source):
 
 def read_write_cached_data(G, source):
     edges = []
-    for u in G.nodes().sort():
-        for v in G.nodes().sort():
-            if u >= v:
-                dist = haversine(u['lat'], u['long'], v['lat'], v['long'])
+    nodes = G.nodes()
+    lats = nx.get_node_attributes(G, 'lat')
+    longs = nx.get_node_attributes(G, 'long')
+    for u in nodes:
+        for v in nodes:
+            if u < v:
+                dist = haversine(lats[u], longs[u], lats[v], longs[v])
                 dur = dist * 4  # Rough estimation of cycling duration, based on an average cycling speed of 15km/ph
                 G.add_edge(u, v, distance=dist, duration=dur)
-                edges.append([u, v, dist, dur])
-    pd.to_csv(edges, map)
 
 #Function taken from example found on http://stackoverflow.com/questions/4913349/haversine-formula-in-python-bearing-and-distance-between-two-gps-points
 def haversine(lon1, lat1, lon2, lat2):
@@ -79,4 +79,6 @@ if __name__ == "__main__":
     api_params = {"contract": "dublin", "apiKey": "52c182bc479e090926da33062b01aba1adc8e18c"}
     G = create_node_graph_from_API(api_params['contract'], api_params['apiKey'])
     print(G.number_of_nodes())
-    create_edges_for_graph(G, False, "latLongDist.csv", None)
+    create_edges_for_graph(G, False, 'latlong.csv', None)
+    print(G.number_of_edges())
+    print(nx.get_edge_attributes(G, 'distance'))
