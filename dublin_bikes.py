@@ -1,5 +1,6 @@
 import networkx as nx
 import random
+from heapq import heappush, heappop
 
 """
 The graph is a closed system representing the flow of Dublin bikes from station to station.
@@ -12,8 +13,9 @@ edge_prob = 0.9 # per-edge probability of existing
 total_bikes = 2000
 centre_radius = 1 # radius distance in km which is considered to be city centre
 centre_prob = 0.1 # Probabilty to add/sub bike from centre locations
-nsteps = 20 # How many time steps to run
-centre_flow = 3 # % centrality we want traffic to flow to
+nsteps = 200 # How many time steps to run
+centre_flow = 2 # % centrality we want traffic to flow to
+people = 50 # Number of people using scheme per step
 
 
 def bikes_refresh(G, station=0, new_count=0, init=False):
@@ -40,10 +42,14 @@ def change_spaces(graph, node, change, add=True):
         if graph.node[node]['spaces'] >= change:
             graph.node[node]['spaces'] -= change
             return(True)
+        else:
+            return(False)
     else:
         if graph.node[node]['spaces'] <= change:
             graph.node[node]['spaces'] += change
             return(True)
+        else:
+            return(False)
 
 def centrality_list(cent_dict):
     """Return sorted list of desc order of node centrality"""
@@ -59,31 +65,39 @@ def am_cycle(G, centrality):
     towards low centrality
     """
     # Get random number of bikes to move
-    bike_count = random.randrange(1, 5)
-    # Go through the nodes until we
-    for node, data in G.nodes(data=True):
-        # Check if it is in top 30% of centrality weighting
+    bike_count = random.randrange(1, 2)
+    # Count of most central nodes
+    central_count = len(centrality)//centre_flow
+    for person in range(people):
+        # Bikes flow from less central nodes to more central in-degree nodes
         # We want to have more flow to these nodes i.e. adding bikes
-        if random.random() >= centrality[len(centrality)//3][0]:
-            # Add bike to station if possible
+        if random.uniform(0.55, 0.99) <= centrality[central_count][0]:
+            # Randomly add bikes to most central nodes
+            node = random.randrange(0, central_count)
             if change_spaces(G, node, bike_count, True):
                 for neigh in G.neighbors(node):
                     # Need to remove same bike count from other nodes
                     # Since this is assumed to be a fully connected graph
                     # And a closed system for counts, then one of the neighbours
                     # will have to have space for these bikes.
-                    change_spaces(G, neigh, bike_count, True)
-                else:
-                    #Check for amount of times station was full
-                    if data['spaces'] == 0:
-                        data['empty'] += 1
-            else:
-                # Remove bike from  station
-                if change_spaces(G, node, bike_count, False):
-                    for neigh in G.neighbors(node):
-                        # Need to remove same bike count from other nodes
-                        change_spaces(G, neigh, bike_count, False)
-
+                    if change_spaces(G, neigh, bike_count, False):
+                        # We found station to remove a bike from so can move onto next step
+                        break
+            # Check for amount of times station was full
+            if G.node[node]['spaces'] == 0:
+                G.node[node]['empty'] += 1
+        else:
+            # Randomly add bikes to least central nodes
+            node = random.randrange(central_count+1, len(centrality)-1)
+            # Add bike to non central station at lower frequency (i.e. probablity)
+            if change_spaces(G, node, bike_count, True):
+                for neigh in G.neighbors(node):
+                    # Need to remove same bike count from other nodes
+                    if change_spaces(G, neigh, bike_count, False):
+                        break
+            # Check for amount of times station was full
+            if G.node[node]['spaces'] == 0:
+                G.node[node]['empty'] += 1
 
 def run():
     # Create real world graph or random graph
@@ -96,15 +110,19 @@ def run():
 
     # Get order of centrality with most central at start
     cent_list = centrality_list(cent)
+    print(cent_list)
 
     # Set up each station at start of run
     bikes_refresh(G, init=True)
 
+    # This is priority queue for truck to redistribute bikes
+    truck_list = []
+
     # Run program for number of steps
     for i in range(nsteps):
         am_cycle(G, cent_list)
-        empty_count = sum(G.node[i]["empty"] for i in G.nodes())
-        print("%2d %.2d" % (i, empty_count))
+        empty_list = [(n, G.node[n]['in_cent'], G.node[n]['empty']) for n in G.nodes() if G.node[n]['empty'] >= 1]
+        print("%s" % (empty_list))
 
 if __name__ == "__main__":
     run()
