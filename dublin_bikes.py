@@ -17,7 +17,30 @@ nsteps = 200 # How many time steps to run
 centre_flow = 2 # % centrality we want traffic to flow to
 people = 50 # Number of people using scheme per step
 
-def bike_trucks(graph, runs, num):
+def move_bikes(graph, stations_list, bike_num):
+    for stn in stations_list:
+        avail = graph.node[stn[1]]['spaces']
+        # Check is all bikes have been redistributed
+        if bike_num<=0:
+            return(True)
+        if avail == 0:
+            # No space so just go to next station
+            continue
+        elif avail < bike_num:
+            # If there are some space drop some bikes and
+            # go to next station with remaining
+            bike_num -= avail
+            # Reset station spaces
+            avail = 0
+            print("Put some bikes in %s, remaining %s" % (stn[1], bike_num))
+        else:
+            # There are more spaces than bikes so drop all bike
+            # and reset station number
+            avail -= bike_num
+            bike_num = 0
+            print("Put all bikes in %s, remaining %s" % (stn[1], bike_num))
+
+def bike_trucks(graph, runs, num, central_list):
     """
     Trucks can collect bikes from full stations and move them to other stations
     First find stations with no free stations, then move to other, less central
@@ -36,13 +59,9 @@ def bike_trucks(graph, runs, num):
             print("TRUCK: %d, %d" % (station[1], graph.node[station[1]]['spaces']))
             if change_spaces(graph, station[1], bikes, False):
                 print("TRUCK COLLECT: %d, %d" % (station[1], graph.node[station[1]]['spaces']))
-                for neigh in graph.neighbors(station[1]):
-                    # Need to remove same bike count from other nodes
-		    # Dont currently work from out to in for central nodes
-                    if change_spaces(graph, neigh, bikes, False):
-                        #If we have moved the bikes then we can break
-                        print("TRUCK DROP: %d, %d" % (neigh, graph.node[neigh]['spaces']))
-                        break
+                # Now move bikes to non central stations
+                move_bikes(graph, sorted(central_list, reverse=True), bikes)
+    return(True)
 
 
 
@@ -63,7 +82,6 @@ def bikes_refresh(G, station=0, new_count=0, init=False):
     else:
         # Reset specifc station, e.g. due to truck distribution
         station['spaces'] = new_count
-
 
 def change_spaces(graph, node, change, add=True):
     if add:
@@ -143,15 +161,12 @@ def run():
     # Set up each station at start of run
     bikes_refresh(G, init=True)
 
-    # This is priority queue for truck to redistribute bikes
-    truck_list = []
-
     # Run program for number of steps
     for i in range(nsteps):
         am_cycle(G, cent_list)
         empty_list = [(n, G.node[n]['in_cent'], G.node[n]['empty']) for n in G.nodes() if G.node[n]['empty'] >= 1]
         # Trucks can move bikes from full stations to less full stations
-        bike_trucks(G, 2, 10)
+        bike_trucks(G, 2, 10, cent_list)
         print("%s" % (empty_list))
 
 if __name__ == "__main__":
