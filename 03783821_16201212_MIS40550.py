@@ -4,48 +4,44 @@ import json
 import pandas as pd
 import os.path as osp
 from math import radians, cos, sin, asin, sqrt
+import random
 
 api_params = {"contract": "dublin", "apiKey": "52c182bc479e090926da33062b01aba1adc8e18c"}
 
-def create_node_graph_from_API(contract, apiKey):
+def create_node_graph_from_api(contract, apiKey):
+    """
+    """
     G = nx.Graph()
     response = requests.get("https://api.jcdecaux.com/vls/v1/stations", params = api_params)
     stations = json.loads(response.text)
     for rec in stations:
         G.add_node(rec['number'], name=rec['name'], lat=rec['position']['lat'], long=rec['position']['lng'], status=rec['status'], bike_stands=rec['bike_stands'], available_bike_stands=rec['available_bike_stands'], available_bikes=rec['available_bikes'])
-
+    create_edges_for_graph(G, False, 'latlong.csv', None)
     return G
 
+def create_random_graph(num_nodes, edge_prob, directed):
+    """
+    """
+    return nx.erdos_renyi_graph(num_nodes, edge_prob, directed)
+
 def create_edges_for_graph(G, useRoads, cacheFile, apiKey=None):
-#    if useRoads == True:                # Use Google Distance Matrix distance
-#        if path.isFile(cacheFile):  # Call Google Distance Matrix API and store in location cache file
-#            read_cached_data(G, cacheFile)
-#        else:               # Use API location cache file
-#            if apiKey == None:
-#                print("Invalid Google Distance Matrix API key...exiting program...")
-#                return
-#            for n in G.nodes():
-#                return
-#            api_params = {"units": "metric", "travel_modes": "bicycling", "origins": origins,
-#                          "destinations": calculate_destinations(G, currentNode), "apiKey": apiKey}
-#            response = requests.get("https://maps.googleapis.com/maps/api/distancematrix/json", params=api_params)
-#            distances = json.loads(response.text)
-#
-#    else:                               # Use straight line distance
+    """
+    """
     if osp.isfile(cacheFile):
         read_cached_data(G, cacheFile)
     else:
         read_write_cached_data(G, cacheFile)
 
-def calculate_destinations(G, u):
-    return 0
-
 def read_cached_data(G, source):
+    """
+    """
     data = pd.read_csv(source, sep=",", header=None)
     for u, v, dist, dur in data.iterrows():
         G.add_edge(u, v, distance=dist, duration=dur)
 
 def read_write_cached_data(G, source):
+    """
+    """
     edges = []
     nodes = G.nodes()
     lats = nx.get_node_attributes(G, 'lat')
@@ -57,9 +53,11 @@ def read_write_cached_data(G, source):
                 dur = dist * 4  # Rough estimation of cycling duration, based on an average cycling speed of 15km/ph
                 G.add_edge(u, v, distance=dist, duration=dur)
 
-#Function taken from example found on http://stackoverflow.com/questions/4913349/haversine-formula-in-python-bearing-and-distance-between-two-gps-points
+#
 def haversine(lon1, lat1, lon2, lat2):
     """
+    Function taken from example found on
+    http://stackoverflow.com/questions/4913349/haversine-formula-in-python-bearing-and-distance-between-two-gps-points
     Calculate the great circle distance between two points
     on the earth (specified in decimal degrees)
     """
@@ -74,11 +72,103 @@ def haversine(lon1, lat1, lon2, lat2):
     r = 6371 # Radius of earth in kilometers. Use 3956 for miles
     return c * r
 
+def run(G):
+    # Calculate in-degree centrality to represent flow of bikes to centre
+    cent = nx.in_degree_centrality(G)
+    # Add centrality values to each node
+    for u in G.nodes():
+        G.node[u]['in_cent'] = cent[u]
+
+    # Get order of centrality with most central at start
+    cent_list = centrality_list(cent)
+
+    # Set up each station at start of run
+    bikes_refresh(G, init=True)
+
+    # Run program for number of steps
+    for i in range(nsteps):
+        am_cycle(G, cent_list)
+        empty_count = sum(G.node[i]["empty"] for i in G.nodes())
+        print("%2d %.2d" % (i, empty_count))
+
+def bikes_refresh(G, station=0, new_count=0, init=False):
+    """
+    Refresh bikes at a station or all stations.
+    station is the node you want to reset
+    spaces is the new available spaces for that node
+    init, optional, if set to True then reset all stations
+    """
+    if init:
+        # Initial setup, create stations relative to centrality
+        # and populate with 50% empty spaces
+        for u in G.nodes():
+            G.node[u]["total"] = int(10*G.node[u]['in_cent'])*10
+            G.node[u]["spaces"] = G.node[u]["total"]/2
+            G.node[u]["empty"] = 0
+    else:
+        # Reset specifc station, e.g. due to truck distribution
+        station['spaces'] = new_count
+
+
+def change_spaces(graph, node, change, add=True):
+    if add:
+        if graph.node[node]['spaces'] >= change:
+            graph.node[node]['spaces'] -= change
+            return(True)
+    else:
+        if graph.node[node]['spaces'] <= change:
+            graph.node[node]['spaces'] += change
+            return(True)
+
+def centrality_list(cent_dict):
+    """Return sorted list of desc order of node centrality"""
+    cent = [(b,a) for (a,b) in cent_dict.items()]
+    return(sorted(cent, reverse=True))
+
+def am_cycle(G, centrality):
+    """
+    One cycle in AM where bikes flow towards central nodes
+    This is one step to allocate a random number of bikes.
+    Assume in-degree of centrality relates to flow of bikes.
+    e.g. in morning this is toward high centrality, but in evening
+    towards low centrality
+    """
+    # Get random number of bikes to move
+    bike_count = random.randrange(1, 5)
+    # Go through the nodes until we
+    for node, data in G.nodes(data=True):
+        # Check if it is in top 30% of centrality weighting
+        # We want to have more flow to these nodes i.e. adding bikes
+        if random.random() >= centrality[len(centrality)//3][0]:
+            # Add bike to station if possible
+            if change_spaces(G, node, bike_count, True):
+                for neigh in G.neighbors(node):
+                    # Need to remove same bike count from other nodes
+                    # Since this is assumed to be a fully connected graph
+                    # And a closed system for counts, then one of the neighbours
+                    # will have to have space for these bikes.
+                    change_spaces(G, neigh, bike_count, True)
+                else:
+                    #Check for amount of times station was full
+                    if data['spaces'] == 0:
+                        data['empty'] += 1
+            else:
+                # Remove bike from  station
+                if change_spaces(G, node, bike_count, False):
+                    for neigh in G.neighbors(node):
+                        # Need to remove same bike count from other nodes
+                        change_spaces(G, neigh, bike_count, False)
+
 if __name__ == "__main__":
 
+    # Adjustable parameters
+    centre_radius = 1  # radius distance in km which is considered to be city centre
+    centre_prob = 0.1  # Probabilty to add/sub bike from centre locations
+    nsteps = 20  # How many time steps to run
+    centre_flow = 3  # % centrality we want traffic to flow to
     api_params = {"contract": "dublin", "apiKey": "52c182bc479e090926da33062b01aba1adc8e18c"}
-    G = create_node_graph_from_API(api_params['contract'], api_params['apiKey'])
-    print(G.number_of_nodes())
-    create_edges_for_graph(G, False, 'latlong.csv', None)
-    print(G.number_of_edges())
-    print(nx.get_edge_attributes(G, 'distance'))
+
+    G1 = create_node_graph_from_api(api_params['contract'], api_params['apiKey'])
+    G2 = create_random_graph(40, 0.9, True)
+    #run(G1)
+    run(G2)
