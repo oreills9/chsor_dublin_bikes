@@ -17,6 +17,33 @@ nsteps = 200 # How many time steps to run
 centre_flow = 2 # % centrality we want traffic to flow to
 people = 50 # Number of people using scheme per step
 
+def bike_trucks(graph, runs, num):
+    """
+    Trucks can collect bikes from full stations and move them to other stations
+    First find stations with no free stations, then move to other, less central
+    stations
+    runs is the number of runs the truck can do, e.g. 1 run means it can move bikes from
+    one station to another
+    num is the number of bikes, in percentage, to move from station, e.g. 10 is 10% and so on
+    """
+    emptyq = []
+    [heappush(emptyq, (-(graph.node[n]['in_cent']), n)) for n in graph.nodes() if graph.node[n]['empty'] >= 1]
+    for run in range(runs):
+        if len(emptyq) > 0:
+            station = heappop(emptyq)
+            bikes = (graph.node[station[1]]['total']*num)//100
+            # pick up bikes from full station
+            print("TRUCK: %d, %d" % (station[1], graph.node[station[1]]['spaces']))
+            if change_spaces(graph, station[1], bikes, False):
+                print("TRUCK COLLECT: %d, %d" % (station[1], graph.node[station[1]]['spaces']))
+                for neigh in graph.neighbors(station[1]):
+                    # Need to remove same bike count from other nodes
+                    if change_spaces(graph, neigh, bikes, False):
+                        #If we have moved the bikes then we can break
+                        print("TRUCK DROP: %d, %d" % (neigh, graph.node[neigh]['spaces']))
+                        break
+
+
 
 def bikes_refresh(G, station=0, new_count=0, init=False):
     """
@@ -122,6 +149,8 @@ def run():
     for i in range(nsteps):
         am_cycle(G, cent_list)
         empty_list = [(n, G.node[n]['in_cent'], G.node[n]['empty']) for n in G.nodes() if G.node[n]['empty'] >= 1]
+        # Trucks can move bikes from full stations to less full stations
+        bike_trucks(G, 2, 10)
         print("%s" % (empty_list))
 
 if __name__ == "__main__":
