@@ -1,29 +1,29 @@
 import networkx as nx
 import requests
 import json
-import pandas as pd
 import os.path as osp
 from math import radians, cos, sin, asin, sqrt
 import random
 import numpy as np
 
-api_params = {"contract": "dublin", "apiKey": "52c182bc479e090926da33062b01aba1adc8e18c"}
-
-def create_node_graph_from_api(contract, apiKey):
+def create_node_graph_from_api(api_params):
     """
+    Function to create a NetworkX directed graph from a set of stations from a real-world station list provided by JCDecaux open API
+    :param contract Contract Name e.g. dublin, paris etc.
+    :param apiKey
     """
     G = nx.DiGraph()
-    response = requests.get("https://api.jcdecaux.com/vls/v1/stations", params = api_params)
+    response = requests.get("https://api.jcdecaux.com/vls/v1/stations", params=api_params)
     stations = json.loads(response.text)
     for rec in stations:
-        G.add_node(rec['number'], name=rec['name'], lat=rec['position']['lat'], long=rec['position']['lng'], status=rec['status'], bike_stands=rec['bike_stands'], available_bike_stands=rec['available_bike_stands'], available_bikes=rec['available_bikes'], centre_dist=0)
+        G.add_node(rec['number'], name=rec['name'], lat=rec['position']['lat'], long=rec['position']['lng'], status=rec['status'], stands=rec['bike_stands'], available=rec['available_bike_stands'], bikes=rec['available_bikes'], centre_dist=0)
 
     lats = nx.get_node_attributes(G, 'lat')
     longs = nx.get_node_attributes(G, 'long')
-    centreX, centreY = calculate_centre_point(list(lats.values()), list(longs.values()))
+    centre_x, centre_y = calculate_centre_point(list(lats.values()), list(longs.values()))
     centre_dist = {}
     for u in G.nodes():
-        centre_dist[u] = haversine(lats[u], longs[u], centreX, centreY)
+        centre_dist[u] = haversine(lats[u], longs[u], centre_x, centre_y )
     nx.set_node_attributes(G, 'centre_dist', centre_dist)
 
     create_edges_for_graph(G, False, 'latlong.csv', None)
@@ -34,25 +34,25 @@ def create_random_graph(num_nodes, edge_prob):
     """
     return nx.erdos_renyi_graph(num_nodes, edge_prob, directed=True)
 
-def create_edges_for_graph(G, useRoads, cacheFile, apiKey=None):
+def create_edges_for_graph(G, cacheFile):
     """
     """
     if osp.isfile(cacheFile):
         read_cached_data(G, cacheFile)
     else:
-        read_write_cached_data(G, cacheFile)
+        create_clean_data(G)
+        nx.write_gml(G, cacheFile)
 
 def read_cached_data(G, source):
     """
     """
-    data = pd.read_csv(source, sep=",", header=None)
-    for u, v, dist, dur in data.iterrows():
-        G.add_edge(u, v, distance=dist, duration=dur)
+    G = nx.read_gml(source)
+    return G
 
 def calculate_centre_point(lats, longs):
     return np.mean(np.asarray(lats)), np.mean(np.asarray(longs))
 
-def read_write_cached_data(G, source):
+def create_clean_data(G):
     """
     """
     lats = nx.get_node_attributes(G, 'lat')
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     centre_flow = 3  # % centrality we want traffic to flow to
     api_params = {"contract": "dublin", "apiKey": "52c182bc479e090926da33062b01aba1adc8e18c"}
 
-    G1 = create_node_graph_from_api(api_params['contract'], api_params['apiKey'])
+    G1 = create_node_graph_from_api(api_params)
     #print("G1 No. of nodes: %i" % G1.number_of_nodes())
     #print("G1 No. of edges: %i" % G1.number_of_edges())
 
