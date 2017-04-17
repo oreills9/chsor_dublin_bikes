@@ -38,6 +38,7 @@ def bike_trucks(graph, runs, num):
                 print("TRUCK COLLECT: %d, %d" % (station[1], graph.node[station[1]]['spaces']))
                 for neigh in graph.neighbors(station[1]):
                     # Need to remove same bike count from other nodes
+		    # Dont currently work from out to in for central nodes
                     if change_spaces(graph, neigh, bikes, False):
                         #If we have moved the bikes then we can break
                         print("TRUCK DROP: %d, %d" % (neigh, graph.node[neigh]['spaces']))
