@@ -5,24 +5,34 @@ import pandas as pd
 import os.path as osp
 from math import radians, cos, sin, asin, sqrt
 import random
+import numpy as np
 
 api_params = {"contract": "dublin", "apiKey": "52c182bc479e090926da33062b01aba1adc8e18c"}
 
 def create_node_graph_from_api(contract, apiKey):
     """
     """
-    G = nx.Graph()
+    G = nx.DiGraph()
     response = requests.get("https://api.jcdecaux.com/vls/v1/stations", params = api_params)
     stations = json.loads(response.text)
     for rec in stations:
-        G.add_node(rec['number'], name=rec['name'], lat=rec['position']['lat'], long=rec['position']['lng'], status=rec['status'], bike_stands=rec['bike_stands'], available_bike_stands=rec['available_bike_stands'], available_bikes=rec['available_bikes'])
+        G.add_node(rec['number'], name=rec['name'], lat=rec['position']['lat'], long=rec['position']['lng'], status=rec['status'], bike_stands=rec['bike_stands'], available_bike_stands=rec['available_bike_stands'], available_bikes=rec['available_bikes'], centre_dist=0)
+
+    lats = nx.get_node_attributes(G, 'lat')
+    longs = nx.get_node_attributes(G, 'long')
+    centreX, centreY = calculate_centre_point(list(lats.values()), list(longs.values()))
+    centre_dist = {}
+    for u in G.nodes():
+        centre_dist[u] = haversine(lats[u], longs[u], centreX, centreY)
+    nx.set_node_attributes(G, 'centre_dist', centre_dist)
+
     create_edges_for_graph(G, False, 'latlong.csv', None)
     return G
 
-def create_random_graph(num_nodes, edge_prob, directed):
+def create_random_graph(num_nodes, edge_prob):
     """
     """
-    return nx.erdos_renyi_graph(num_nodes, edge_prob, directed)
+    return nx.erdos_renyi_graph(num_nodes, edge_prob, directed=True)
 
 def create_edges_for_graph(G, useRoads, cacheFile, apiKey=None):
     """
@@ -39,19 +49,23 @@ def read_cached_data(G, source):
     for u, v, dist, dur in data.iterrows():
         G.add_edge(u, v, distance=dist, duration=dur)
 
+def calculate_centre_point(lats, longs):
+    return np.mean(np.asarray(lats)), np.mean(np.asarray(longs))
+
 def read_write_cached_data(G, source):
     """
     """
-    edges = []
-    nodes = G.nodes()
     lats = nx.get_node_attributes(G, 'lat')
     longs = nx.get_node_attributes(G, 'long')
+    centre_dist = nx.get_node_attributes(G, 'centre_dist')
+    nodes = G.nodes()
     for u in nodes:
         for v in nodes:
-            if u < v:
+            if centre_dist[u] > centre_dist[v]:
                 dist = haversine(lats[u], longs[u], lats[v], longs[v])
-                dur = dist * 4  # Rough estimation of cycling duration, based on an average cycling speed of 15km/ph
-                G.add_edge(u, v, distance=dist, duration=dur)
+                if dist <= 5:
+                    dur = dist * 6  # Rough estimation of cycling duration, based on an average cycling speed of 10km/ph
+                    G.add_edge(u, v, distance=dist, duration=dur)
 
 #
 def haversine(lon1, lat1, lon2, lat2):
@@ -72,7 +86,7 @@ def haversine(lon1, lat1, lon2, lat2):
     r = 6371 # Radius of earth in kilometers. Use 3956 for miles
     return c * r
 
-def run(G):
+def calculate_graph_centrality_list(G):
     # Calculate in-degree centrality to represent flow of bikes to centre
     cent = nx.in_degree_centrality(G)
     # Add centrality values to each node
@@ -80,7 +94,11 @@ def run(G):
         G.node[u]['in_cent'] = cent[u]
 
     # Get order of centrality with most central at start
-    cent_list = centrality_list(cent)
+    return centrality_list(cent)
+
+
+def run(G):
+    cent_list = calculate_graph_centrality_list(G)
 
     # Set up each station at start of run
     bikes_refresh(G, init=True)
@@ -169,6 +187,12 @@ if __name__ == "__main__":
     api_params = {"contract": "dublin", "apiKey": "52c182bc479e090926da33062b01aba1adc8e18c"}
 
     G1 = create_node_graph_from_api(api_params['contract'], api_params['apiKey'])
-    G2 = create_random_graph(40, 0.9, True)
-    #run(G1)
+    #print("G1 No. of nodes: %i" % G1.number_of_nodes())
+    #print("G1 No. of edges: %i" % G1.number_of_edges())
+
+    G2 = create_random_graph(100, 0.4) # 0.4 generated from the approx. stops that a cyclist can get to in 30 mins, assuming a 10kph speed on average
+    #print("G2 No. of nodes: %i" % G2.number_of_nodes())
+    #print("G2 No. of edges: %i" % G2.number_of_edges())
+
+    run(G1)
     run(G2)
