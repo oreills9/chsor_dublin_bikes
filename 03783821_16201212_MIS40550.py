@@ -25,11 +25,11 @@ def create_node_graph_from_api(api_params):
     # Connect to the JCDecaux API and retrieve the station JSON data from which we create the graph
     response = requests.get("https://api.jcdecaux.com/vls/v1/stations", params=api_params)
     stations = json.loads(response.text)
-
+    people = 0
     # Create nodes
     for idx, rec in enumerate(stations):
-        G.add_node(idx, name=rec['name'], long=rec['position']['lng'], lat=rec['position']['lat'], status=rec['status'], stands=rec['bike_stands'], available=rec['available_bike_stands'], bikes=rec['available_bikes'], centre_dist=0)
-
+        G.add_node(idx, name=rec['name'], long=rec['position']['lng'], lat=rec['position']['lat'], status=rec['status'], total=rec['bike_stands'], spaces=rec['available_bike_stands'], bikes=rec['available_bikes'], centre_dist=0)
+        people += rec['available_bikes']
     # Retrieving co-ordinates for the station locations
     longs = nx.get_node_attributes(G, 'long')
     lats = nx.get_node_attributes(G, 'lat')
@@ -229,8 +229,10 @@ def bikes_init(G):
     # Initial setup, create stations relative to centrality
     # and populate with 50% empty spaces
     for u in G.nodes():
-        G.node[u]["total"] = int(10*G.node[u]['in_cent'])*10
-        G.node[u]["spaces"] = G.node[u]["total"]/2
+        if "total" not in G.node[u]: # Check if total is populated already
+            G.node[u]["total"] = int(10*G.node[u]['in_cent'])*10
+        if "spaces" not in G.node[u]:# Check if spaces is populated already
+            G.node[u]["spaces"] = G.node[u]["total"]/2
         # Track how many times someone tried to take bike from station
         # and it was not available
         G.node[u]["empty"] = 0
@@ -327,8 +329,8 @@ if __name__ == "__main__":
 
     print("G1 No. of nodes: %i" % G1.number_of_nodes())
     print("G1 No. of edges: %i" % G1.number_of_edges())
-    print("G2 No. of nodes: %i" % G2.number_of_nodes())
-    print("G2 No. of edges: %i" % G2.number_of_edges())
+    #print("G2 No. of nodes: %i" % G2.number_of_nodes())
+    #print("G2 No. of edges: %i" % G2.number_of_edges())
 
     run(G1)
-    run(G2)
+    #run(G2)
