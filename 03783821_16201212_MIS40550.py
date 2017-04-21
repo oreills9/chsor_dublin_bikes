@@ -146,7 +146,7 @@ def run(G, csv_file):
         full_list = [(n, G.node[n]['in_cent'], G.node[n]['full']) for n in G.nodes() if G.node[n]['full'] >= 1]
         # Trucks can move bikes from full stations to less full stations
         csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
-        bike_trucks(G, 2, 10, cent_list)
+        #bike_trucks(G, 2, 10, cent_list)
         print("Full Count: %s\nEmpty Count %s" % (empty_list, full_list))
 
         [csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
@@ -223,15 +223,15 @@ def bike_trucks(graph, runs, num, central_list):
     num is the number of bikes, in percentage, to move from station, e.g. 10 is 10% and so on
     """
     emptyq = []
-    [heappush(emptyq, (-(graph.node[n]['in_cent']), n)) for n in graph.nodes() if graph.node[n]['empty'] >= 1]
+    [heappush(emptyq, (-(graph.node[n]['in_cent']), n)) for n in graph.nodes() if graph.node[n]['full'] >= 1]
     for run in range(runs):
         if len(emptyq) > 0:
             station = heappop(emptyq)
             bikes = (graph.node[station[1]]['total']*num)//100
             # pick up bikes from full station
-            #print("TRUCK: %d, %d" % (station[1], graph.node[station[1]]['spaces']))
+            print("TRUCK: %d, %d, %d" % (station[1], graph.node[station[1]]['spaces'], bikes))
             if check_station(graph, station[1], bikes, False, False):
-                #print("TRUCK COLLECT: %d, %d" % (station[1], graph.node[station[1]]['spaces']))
+                print("TRUCK COLLECT: %d, %d" % (station[1], graph.node[station[1]]['spaces']))
                 # Now move bikes to non central stations
                 add_bikes(graph, sorted(central_list, reverse=True), bikes, False)
     return(True)
