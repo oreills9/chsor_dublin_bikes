@@ -109,13 +109,38 @@ def haversine(long1, lat1, long2, lat2):
     r = 6371 # Radius of earth in kilometers. Use 3956 for miles
     return c * r
 
-def centrality_list(cent_dict):
+def centrality_list(cent_dict, am=True):
     """
     Return sorted list of desc order of node centrality
     :param cent_dict Dictionary of degree centralities for the nodes
+    :am If it is morning time then there are a smaller number of central nodes.
+    If not am then it is a larger number of outer nodes which have higher centrality
     """
-    cent = [(b,a) for (a,b) in cent_dict.items()]
+    if am:
+        cent = [(b,a) for (a,b) in cent_dict.items()]
+    else:
+        # Not AM so 1-centrality count and reverse the list
+        cent = [(1 - b, a) for (a, b) in cent_dict.items()]
     return(sorted(cent, reverse=True))
+
+def get_centre_count(cent_list, cent_ratio, am=True):
+    """
+    Get the number of center nodes to use to distribute traffic to.
+    The higher the ratio the smaller the number of nodes traffic will flow towards
+    :param cent_list: list of nodes with in degree centrality
+    :param cent_ratio: the ratio we want to apply to calculate the number of nodes
+    :param am: time of day, am or pm, default is AM
+    :return: number which represents the number of nodes to be considered the centre
+    """
+    # Count of most central nodes
+    central_count = len(cent_list)//cent_ratio
+    if not am:
+        # Not AM means we want to to simulate a traffic going to a higher
+        # number of outer nodes rather than a smaller number of central.
+        # There is no one outer center. So we reverse the flow of the AM
+        central_count = len(cent_list) - central_count
+    return(central_count)
+
 
 def run(G, csv_file):
     """
@@ -130,16 +155,20 @@ def run(G, csv_file):
         G.node[u]['in_cent'] = cent[u]
 
     # Get order of centrality with most central at start
-    cent_list =  centrality_list(cent)
+    cent_list =  centrality_list(cent, am=False)
     [print(tup) for tup in cent_list]
 
     # Set up each station at start of run
     bikes_init(G)
 
+    # Get the number of nodes we want to consider as the centre
+    centre_num = get_centre_count(cent_list, centre_flow, am=False)
+    print(centre_num)
+
     # Run program for number of steps
     for i in range(nsteps):
         print("STEP %d" % (i))
-        am_cycle(G, cent_list)
+        bike_flow(G, cent_list, centre_num)
         csv_file.writerow((["REDISTRIBUTE VIA PEOPLE"]))
         [csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
         empty_list = [(n, G.node[n]['in_cent'], G.node[n]['empty']) for n in G.nodes() if G.node[n]['empty'] >= 1]
@@ -296,18 +325,19 @@ def check_station(G, node, change, add=True, person=True):
         else:
             return(False)
 
-def am_cycle(G, central_list):
+def bike_flow(G, central_list, central_count):
     """
-    One cycle in AM where bikes flow towards central nodes
+    One flow of number of bikes flow towards central nodes.
     This is one step to allocate a random number of bikes.
     Assume in-degree of centrality relates to flow of bikes.
     e.g. in morning this is toward high centrality, but in evening
-    towards low centrality
+    towards low centrality outer nodes.
     """
     # Get random number of bikes to move
     bike_count = random.randrange(1, 2)
-    # Count of most central nodes
-    central_count = len(central_list)//centre_flow
+
+
+    print("CENTRAL COUNT %d" % central_count)
     for person in range(people):
         print("PERSON: %d" % (person))
         [print(x) for x in G.nodes(data=True)]
