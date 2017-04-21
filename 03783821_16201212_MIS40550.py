@@ -45,7 +45,7 @@ def create_node_graph_from_api(api_params):
 
     # Create edges using the nodes
     create_edges_for_graph(G)
-    return G
+    return G, people
 
 def create_random_graph(num_nodes, edge_prob):
     """
@@ -232,7 +232,7 @@ def bikes_init(G):
         if "total" not in G.node[u]: # Check if total is populated already
             G.node[u]["total"] = int(10*G.node[u]['in_cent'])*10
         if "spaces" not in G.node[u]:# Check if spaces is populated already
-            G.node[u]["spaces"] = G.node[u]["total"]/2
+            G.node[u]["spaces"] = int(G.node[u]["total"]/2)
         # Track how many times someone tried to take bike from station
         # and it was not available
         G.node[u]["empty"] = 0
@@ -311,6 +311,11 @@ def am_cycle(G, central_list):
                 # We found station to remove a bike from so can move onto next step
                 break
 
+    print("Total - Spaces - Full - Empty")
+    print(nx.get_node_attributes(G, 'total'))
+    print(nx.get_node_attributes(G, 'spaces'))
+    print(nx.get_node_attributes(G, 'full'))
+    print(nx.get_node_attributes(G, 'empty'))
 if __name__ == "__main__":
 
     # Adjustable parameters
@@ -324,13 +329,13 @@ if __name__ == "__main__":
     people = 50  # Number of people using scheme per step
     api_params = {"contract": "dublin", "apiKey": "52c182bc479e090926da33062b01aba1adc8e18c"}
 
-    G1 = create_node_graph_from_api(api_params)
+    #G1, people = create_node_graph_from_api(api_params)
     G2 = create_random_graph(station_count, edge_prob)
 
-    print("G1 No. of nodes: %i" % G1.number_of_nodes())
-    print("G1 No. of edges: %i" % G1.number_of_edges())
+    #print("G1 No. of nodes: %i" % G1.number_of_nodes())
+    #print("G1 No. of edges: %i" % G1.number_of_edges())
     #print("G2 No. of nodes: %i" % G2.number_of_nodes())
     #print("G2 No. of edges: %i" % G2.number_of_edges())
 
-    run(G1)
-    #run(G2)
+    #run(G1)
+    run(G2)
