@@ -151,7 +151,12 @@ def run(G, csv_file):
 
         [csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
 
-
+"""
+Add bikes to one stations. This does not try and find other stations
+It simply checks the chose station an returns true or false depending
+on whether there is space to take the relevant action. If not a separate
+function can find another suitable station or stations to allocate the bike
+"""
 def add_bikes(graph, stations_list, bike_num, person=True):
     for stn in stations_list:
         spaces = graph.node[stn[1]]['spaces']
