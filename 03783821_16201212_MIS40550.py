@@ -96,6 +96,7 @@ def haversine(long1, lat1, long2, lat2):
     :param long2 Second longitude value
     :param lat2 Second latitude value
     """
+
     # convert decimal degrees to radians
     long1, lat1, long2, lat2 = map(radians, [long1, lat1, long2, lat2])
 
@@ -129,7 +130,6 @@ def run(G):
 
     # Get order of centrality with most central at start
     cent_list =  centrality_list(cent)
-    #print(cent_list)
 
     # Set up each station at start of run
     bikes_init(G)
@@ -143,9 +143,17 @@ def run(G):
         bike_trucks(G, 2, 10, cent_list)
         #print("Full Count: %s\nEmpty Count %s" % (empty_list, full_list))
 
-def add_bikes(graph, stations_list, bike_num, person=True):
+def add_bikes(G, stations_list, bike_num, person=True):
+    """
+    Function to add bikes to the calculated station based on its centrality
+    :param G NetworkX graph
+    :param stations_list
+    :param bike_num
+    :param person
+    """
+
     for stn in stations_list:
-        spaces = graph.node[stn[1]]['spaces']
+        spaces = G.node[stn[1]]['spaces']
         # Check if all bikes have been redistributed
         if bike_num <= 0:
             return(True)
@@ -157,23 +165,31 @@ def add_bikes(graph, stations_list, bike_num, person=True):
             # go to next station with remaining bikes
             bike_num -= spaces
             # There are no spaces now so set this to zero
-            graph.node[stn[1]]['spaces'] = 0
+            G.node[stn[1]]['spaces'] = 0
             # If this is a truck moving bikes then ignore
             # Otherwise count it as person that cant add bike
             if person:
-                graph.node[stn[1]]['full'] += 1
+                G.node[stn[1]]['full'] += 1
             print("Put some bikes in %s, remaining %s" % (stn[1], bike_num))
         else:
             # There are more spaces than bikes so drop all bike
             # and reset station number
-            graph.node[stn[1]]['spaces'] -= bike_num
+            G.node[stn[1]]['spaces'] -= bike_num
             bike_num = 0
             print("Put all bikes in %s, remaining %s" % (stn[1], bike_num))
 
-def remove_bikes(graph, stations_list, bike_num, person=True):
+def remove_bikes(G, stations_list, bike_num, person=True):
+    """
+    Function to remove bikes from the clculated station based on its centrality
+    :param G NetworkX graph
+    :param stations_list
+    :param bike_num
+    :param person
+    """
+
     for stn in stations_list:
-        spaces = graph.node[stn[1]]['spaces']
-        total = graph.node[stn[1]]['total']
+        spaces = G.node[stn[1]]['spaces']
+        total = G.node[stn[1]]['total']
         spare_bikes = total - spaces
         # Check is all bikes have been redistributed
         if bike_num <= 0:
@@ -186,20 +202,20 @@ def remove_bikes(graph, stations_list, bike_num, person=True):
             # so take some bikes and move to next station
             bike_num -= spare_bikes
             # Reset station spaces
-            graph.node[stn[1]]['spaces'] += spare_bikes
+            G.node[stn[1]]['spaces'] += spare_bikes
             print("Removed some bikes in %s, remaining %s" % (stn[1], bike_num))
             # If truck is moving bikes it does not count
             # Only care is people cannot find a bike
             if person:
-                graph.node[stn[1]]['empty']+=1
+                G.node[stn[1]]['empty']+=1
         else:
             # There are more spare bikes than we need so
             # we can take all bikes from this station
-            graph.node[stn[1]]['spaces'] += bike_num
+            G.node[stn[1]]['spaces'] += bike_num
             bike_num = 0
             print("Removed all bikes in %s, remaining %s" % (stn[1], bike_num))
 
-def bike_trucks(graph, runs, num, central_list):
+def bike_trucks(G, runs, num, central_list):
     """
     Trucks can collect bikes from full stations and move them to other stations
     First find stations with no free stations, then move to other, less central
@@ -209,17 +225,17 @@ def bike_trucks(graph, runs, num, central_list):
     num is the number of bikes, in percentage, to move from station, e.g. 10 is 10% and so on
     """
     emptyq = []
-    [heappush(emptyq, (-(graph.node[n]['in_cent']), n)) for n in graph.nodes() if graph.node[n]['empty'] >= 1]
+    [heappush(emptyq, (-(G.node[n]['in_cent']), n)) for n in G.nodes() if G.node[n]['empty'] >= 1]
     for run in range(runs):
         if len(emptyq) > 0:
             station = heappop(emptyq)
-            bikes = (graph.node[station[1]]['total']*num)//100
+            bikes = (G.node[station[1]]['total']*num)//100
             # pick up bikes from full station
-            #print("TRUCK: %d, %d" % (station[1], graph.node[station[1]]['spaces']))
-            if check_station(graph, station[1], bikes, False, False):
-                #print("TRUCK COLLECT: %d, %d" % (station[1], graph.node[station[1]]['spaces']))
+            #print("TRUCK: %d, %d" % (station[1], G.node[station[1]]['spaces']))
+            if check_station(G, station[1], bikes, False, False):
+                #print("TRUCK COLLECT: %d, %d" % (station[1], G.node[station[1]]['spaces']))
                 # Now move bikes to non central stations
-                add_bikes(graph, sorted(central_list, reverse=True), bikes, False)
+                add_bikes(G, sorted(central_list, reverse=True), bikes, False)
     return(True)
 
 def bikes_init(G):
@@ -240,29 +256,34 @@ def bikes_init(G):
         # and there was no room
         G.node[u]["full"] = 0
 
-def check_station(graph, node, change, add=True, person=True):
-    spaces = graph.node[node]['spaces']
-    total = graph.node[node]['total']
+def check_station(G, node, change, add=True, person=True):
+    """
+    Main run function which kicks off the simulation
+    :param G NetworkX graph
+    """
+
+    spaces = G.node[node]['spaces']
+    total = G.node[node]['total']
     spare_bikes = total - spaces
     if add:
         if spaces >= change:
-            graph.node[node]['spaces'] -= change
+            G.node[node]['spaces'] -= change
             # If this is a truck moving bikes then ignore
             # Otherwise count it as person that cant add bike
             if person:
-                if graph.node[node]['spaces'] == 0:
-                    graph.node[node]['full'] += 1
+                if G.node[node]['spaces'] == 0:
+                    G.node[node]['full'] += 1
             return(True)
         else:
             return(False)
     else:
         if spare_bikes >= change:
-            graph.node[node]['spaces'] += change
+            G.node[node]['spaces'] += change
             # If truck is moving bikes it does not count
             # Only care if people cannot find a bike
             if person:
-                if (total - graph.node[node]['spaces']) == 0:
-                    graph.node[node]['empty'] += 1
+                if (total - G.node[node]['spaces']) == 0:
+                    G.node[node]['empty'] += 1
             return(True)
         else:
             return(False)
