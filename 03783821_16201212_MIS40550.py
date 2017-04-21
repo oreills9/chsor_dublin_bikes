@@ -6,6 +6,8 @@ import random
 import numpy as np
 from heapq import heappush, heappop
 import csv
+import pandas as pd
+import matplotlib.pyplot as plt
 
 """
 The graph is a closed system representing the flow of Dublin bikes from station to station.
@@ -28,10 +30,14 @@ def create_node_graph_from_api(api_params):
     response = requests.get("https://api.jcdecaux.com/vls/v1/stations", params=api_params)
     stations = json.loads(response.text)
     people = 0
+    total_bikes = 0
+
     # Create nodes
     for idx, rec in enumerate(stations):
         G.add_node(idx, name=rec['name'], long=rec['position']['lng'], lat=rec['position']['lat'], status=rec['status'], total=rec['bike_stands'], spaces=rec['available_bike_stands'], bikes=rec['available_bikes'], centre_dist=0)
         people += rec['available_bikes']
+        total_bikes += rec['bike_stands']
+
     # Retrieving co-ordinates for the station locations
     longs = nx.get_node_attributes(G, 'long')
     lats = nx.get_node_attributes(G, 'lat')
@@ -42,12 +48,12 @@ def create_node_graph_from_api(api_params):
     # Add the distance from the centre point as an attribute to the node attribute list
     centre_dist = {}
     for u in G.nodes():
-        centre_dist[u] = haversine(longs[u], lats[u] , centre_y, centre_x)
+        centre_dist[u] = haversine(longs[u], lats[u] , centre_x, centre_y)
     nx.set_node_attributes(G, 'centre_dist', centre_dist)
 
     # Create edges using the nodes
     create_edges_for_graph(G)
-    return G, people
+    return G, len(stations), people, total_bikes
 
 def create_random_graph(num_nodes, edge_prob):
     """
@@ -75,8 +81,8 @@ def create_edges_for_graph(G):
             if centre_dist[u] > centre_dist[v]:
                 # Calculate distance from the u node to the v node
                 dist = haversine(longs[u], lats[u], longs[v], lats[v])
-                #Only allow edges to be created if the stations are less than 5km apart i.e. 30 mins away with an average speed of 10kph (otherwise it's a paid joourney)
-                if dist <= 5:
+                #Only allow edges to be created if the stations are less than 1.5km apart i.e. 9 mins away with an average speed of 10kph (otherwise it's a paid joourney)
+                if dist <= 1.5:
                     dur = dist * 6  # Rough estimation of cycling duration, based on an average cycling speed of 10km/ph
                     G.add_edge(u, v, distance=dist, duration=dur)
 
@@ -131,21 +137,19 @@ def run(G, csv_file):
 
     # Get order of centrality with most central at start
     cent_list =  centrality_list(cent)
-    [print(tup) for tup in cent_list]
+    #[print(tup) for tup in cent_list]
 
     # Set up each station at start of run
     bikes_init(G)
 
     # Run program for number of steps
     for i in range(nsteps):
-        print("STEP %d" % (i))
+        #print("STEP %d" % (i))
         am_cycle(G, cent_list)
-        csv_file.writerow((["REDISTRIBUTE VIA PEOPLE"]))
         [csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
         empty_list = [(n, G.node[n]['in_cent'], G.node[n]['empty']) for n in G.nodes() if G.node[n]['empty'] >= 1]
         full_list = [(n, G.node[n]['in_cent'], G.node[n]['full']) for n in G.nodes() if G.node[n]['full'] >= 1]
         # Trucks can move bikes from full stations to less full stations
-        csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
         #bike_trucks(G, 2, 10, cent_list)
         print("Full Count: %s\nEmpty Count %s" % (empty_list, full_list))
 
@@ -177,13 +181,13 @@ def add_bikes(G, stations_list, bike_num, person=True):
             # Otherwise count it as person that cant add bike
             if person:
                 G.node[stn[1]]['full'] += 1
-            print("Put some bikes in %s, remaining %s" % (stn[1], bike_num))
+            #print("Put some bikes in %s, remaining %s" % (stn[1], bike_num))
         else:
             # There are more spaces than bikes so drop all bike
             # and reset station number
             G.node[stn[1]]['spaces'] -= bike_num
             bike_num = 0
-            print("Put all bikes in %s, remaining %s" % (stn[1], bike_num))
+            #print("Put all bikes in %s, remaining %s" % (stn[1], bike_num))
 
 def remove_bikes(G, stations_list, bike_num, person=True):
     """
@@ -210,7 +214,7 @@ def remove_bikes(G, stations_list, bike_num, person=True):
             bike_num -= spare_bikes
             # Reset station spaces
             G.node[stn[1]]['spaces'] += spare_bikes
-            print("Removed some bikes in %s, remaining %s" % (stn[1], bike_num))
+            #print("Removed some bikes in %s, remaining %s" % (stn[1], bike_num))
             # If truck is moving bikes it does not count
             # Only care is people cannot find a bike
             if person:
@@ -220,7 +224,7 @@ def remove_bikes(G, stations_list, bike_num, person=True):
             # we can take all bikes from this station
             G.node[stn[1]]['spaces'] += bike_num
             bike_num = 0
-            print("Removed all bikes in %s, remaining %s" % (stn[1], bike_num))
+            #print("Removed all bikes in %s, remaining %s" % (stn[1], bike_num))
 
 def bike_trucks(G, runs, num, central_list):
     """
@@ -232,15 +236,15 @@ def bike_trucks(G, runs, num, central_list):
     num is the number of bikes, in percentage, to move from station, e.g. 10 is 10% and so on
     """
     emptyq = []
-    [heappush(emptyq, (-(graph.node[n]['in_cent']), n)) for n in graph.nodes() if graph.node[n]['full'] >= 1]
+    [heappush(emptyq, (-(G.node[n]['in_cent']), n)) for n in G.nodes() if G.node[n]['full'] >= 1]
     for run in range(runs):
         if len(emptyq) > 0:
             station = heappop(emptyq)
             bikes = (G.node[station[1]]['total']*num)//100
             # pick up bikes from full station
-            print("TRUCK: %d, %d, %d" % (station[1], G.node[station[1]]['spaces'], bikes))
-            if check_station(graph, station[1], bikes, False, False):
-                print("TRUCK COLLECT: %d, %d" % (station[1], G.node[station[1]]['spaces']))
+            #print("TRUCK: %d, %d, %d" % (station[1], G.node[station[1]]['spaces'], bikes))
+            if check_station(G, station[1], bikes, False, False):
+                #print("TRUCK COLLECT: %d, %d" % (station[1], G.node[station[1]]['spaces']))
                 # Now move bikes to non central stations
                 add_bikes(G, sorted(central_list, reverse=True), bikes, False)
     return(True)
@@ -309,17 +313,17 @@ def am_cycle(G, central_list):
     # Count of most central nodes
     central_count = len(central_list)//centre_flow
     for person in range(people):
-        print("PERSON: %d" % (person))
-        [print(x) for x in G.nodes(data=True)]
-        print("\n")
+        #print("PERSON: %d" % (person))
+        #[print(x) for x in G.nodes(data=True)]
+        #print("\n")
         # Bikes flow from less central nodes to more central in-degree nodes
         # We want to have more flow to these nodes i.e. adding bikes
         rand = random.uniform(0.1, 0.99)
-        print(rand, central_list[central_count][0])
+        #print(rand, central_list[central_count][0])
         if rand <= central_list[central_count][0]:
             # Randomly choose from most central stations
             node = random.randrange(0, central_count)
-            print("NODE:%s" % node)
+            #print("NODE:%s" % node)
             # Add bikes to randomly selected station
             if check_station(G, node, bike_count, True):
                 # There was room in destination station
@@ -331,7 +335,7 @@ def am_cycle(G, central_list):
         else:
             # Randomly add bikes to least central nodes
             node = random.randrange(central_count+1, len(central_list)-1)
-            print("NON-CENTRAL-NODE:%s" % node)
+            #print("NON-CENTRAL-NODE:%s" % node)
             # Add bike to non central station based on random probability range
             if check_station(G, node, bike_count, True):
                 # There was room in destination station
@@ -352,6 +356,16 @@ def am_cycle(G, central_list):
     print(nx.get_node_attributes(G, 'spaces'))
     print(nx.get_node_attributes(G, 'full'))
     print(nx.get_node_attributes(G, 'empty'))
+
+def write_graph_to_gml(G, file):
+    nx.write_graphml(G, file)
+def plot_nx_graph(G):
+    nx.draw(G)
+def plot_graph_from_csv(inf, outf):
+    return
+    #data = pd.read_csv(inf, skiprows=1)
+    #plt.savefig(outf, format="PNG")
+
 if __name__ == "__main__":
 
     # Adjustable parameters
@@ -364,23 +378,24 @@ if __name__ == "__main__":
     centre_flow = 3  # % centrality we want traffic to flow to
     people = 20  # Number of people using scheme per run
     api_params = {"contract": "dublin", "apiKey": "52c182bc479e090926da33062b01aba1adc8e18c"}
-    output_file = "bike_share.csv"
-    file = open(output_file, 'wt')
+    csv_output_file = "bike_share2.csv"
+    gml_output_file = "bike_share2.graphml"
+    csv_file = open(csv_output_file, 'wt')
     try:
-        writer = csv.writer(file)
-        writer.writerow(("Stations", "Bikes", "Steps", "People"))
+        writer = csv.writer(csv_file, lineterminator='\n')
         writer.writerow(("Node", "Run", "Total Spaces", "Remaining Spaces", "Full Count", "Empty Count"))
 
-        #G1 = create_node_graph_from_api(api_params)
-        G2 = create_random_graph(station_count, edge_prob)
-
+        #G1, station_count, people, total_bikes = create_node_graph_from_api(api_params)
         #print("G1 No. of nodes: %i" % G1.number_of_nodes())
         #print("G1 No. of edges: %i" % G1.number_of_edges())
+        #run(G1, writer)
 
+        G2 = create_random_graph(station_count, edge_prob)
         print("G2 No. of nodes: %i" % G2.number_of_nodes())
         print("G2 No. of edges: %i" % G2.number_of_edges())
-
-        #run(G1, writer)
         run(G2, writer)
     finally:
-        file.close()
+        csv_file.close()
+    write_graph_to_gml(G2, gml_output_file)
+    plot_nx_graph(G2)
+    #plot_graph_from_csv(csv_output_file)
