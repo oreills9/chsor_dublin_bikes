@@ -157,6 +157,7 @@ It simply checks the chose station an returns true or false depending
 on whether there is space to take the relevant action. If not a separate
 function can find another suitable station or stations to allocate the bike
 """
+
 def add_bikes(G, stations_list, bike_num, person=True):
     for stn in stations_list:
         spaces = G.node[stn[1]]['spaces']
@@ -271,6 +272,7 @@ def check_station(G, node, change, add=True, person=True):
     spaces = G.node[node]['spaces']
     total = G.node[node]['total']
     spare_bikes = total - spaces
+    #print("check station spaces: %s, total: %s, station: %s, bikes: %s" % (spaces, total, node, change))
     if add:
         if spaces >= change:
             G.node[node]['spaces'] -= change
@@ -374,6 +376,7 @@ if __name__ == "__main__":
 
         #print("G1 No. of nodes: %i" % G1.number_of_nodes())
         #print("G1 No. of edges: %i" % G1.number_of_edges())
+
         print("G2 No. of nodes: %i" % G2.number_of_nodes())
         print("G2 No. of edges: %i" % G2.number_of_edges())
 
