@@ -406,6 +406,7 @@ if __name__ == "__main__":
 
         #print("G1 No. of nodes: %i" % G1.number_of_nodes())
         #print("G1 No. of edges: %i" % G1.number_of_edges())
+
         print("G2 No. of nodes: %i" % G2.number_of_nodes())
         print("G2 No. of edges: %i" % G2.number_of_edges())
 
