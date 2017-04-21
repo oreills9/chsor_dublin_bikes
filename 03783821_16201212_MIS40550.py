@@ -5,6 +5,7 @@ from math import radians, cos, sin, asin, sqrt
 import random
 import numpy as np
 from heapq import heappush, heappop
+import csv
 
 """
 The graph is a closed system representing the flow of Dublin bikes from station to station.
@@ -15,7 +16,8 @@ Alternatively, if it is empty it is assumed to have all free spaces and no avail
 
 def create_node_graph_from_api(api_params):
     """
-    Function to create a NetworkX directed graph from a set of stations from a real-world station list provided by JCDecaux open API
+    Function to create a NetworkX directed graph from a set of stations from a
+    real-world station list provided by JCDecaux open API
     :param api_params Contains the variables requires to create the graph (and store it)
     """
 
@@ -115,7 +117,7 @@ def centrality_list(cent_dict):
     cent = [(b,a) for (a,b) in cent_dict.items()]
     return(sorted(cent, reverse=True))
 
-def run(G):
+def run(G, csv_file):
     """
     Main run function which kicks off the simulation
     :param G NetworkX graph
@@ -129,19 +131,26 @@ def run(G):
 
     # Get order of centrality with most central at start
     cent_list =  centrality_list(cent)
-    #print(cent_list)
+    [print(tup) for tup in cent_list]
 
     # Set up each station at start of run
     bikes_init(G)
 
     # Run program for number of steps
     for i in range(nsteps):
+        print("STEP %d" % (i))
         am_cycle(G, cent_list)
+        csv_file.writerow((["REDISTRIBUTE VIA PEOPLE"]))
+        [csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
         empty_list = [(n, G.node[n]['in_cent'], G.node[n]['empty']) for n in G.nodes() if G.node[n]['empty'] >= 1]
         full_list = [(n, G.node[n]['in_cent'], G.node[n]['full']) for n in G.nodes() if G.node[n]['full'] >= 1]
         # Trucks can move bikes from full stations to less full stations
+        csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
         bike_trucks(G, 2, 10, cent_list)
-        #print("Full Count: %s\nEmpty Count %s" % (empty_list, full_list))
+        print("Full Count: %s\nEmpty Count %s" % (empty_list, full_list))
+
+        [csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
+
 
 def add_bikes(graph, stations_list, bike_num, person=True):
     for stn in stations_list:
@@ -244,6 +253,7 @@ def check_station(graph, node, change, add=True, person=True):
     spaces = graph.node[node]['spaces']
     total = graph.node[node]['total']
     spare_bikes = total - spaces
+    #print("check station spaces: %s, total: %s, station: %s, bikes: %s" % (spaces, total, node, change))
     if add:
         if spaces >= change:
             graph.node[node]['spaces'] -= change
@@ -280,11 +290,17 @@ def am_cycle(G, central_list):
     # Count of most central nodes
     central_count = len(central_list)//centre_flow
     for person in range(people):
+        print("PERSON: %d" % (person))
+        [print(x) for x in G.nodes(data=True)]
+        print("\n")
         # Bikes flow from less central nodes to more central in-degree nodes
         # We want to have more flow to these nodes i.e. adding bikes
-        if random.uniform(0.55, 0.99) <= central_list[central_count][0]:
+        rand = random.uniform(0.1, 0.99)
+        print(rand, central_list[central_count][0])
+        if rand <= central_list[central_count][0]:
             # Randomly choose from most central stations
             node = random.randrange(0, central_count)
+            print("NODE:%s" % node)
             # Add bikes to randomly selected station
             if check_station(G, node, bike_count, True):
                 # There was room in destination station
@@ -296,6 +312,7 @@ def am_cycle(G, central_list):
         else:
             # Randomly add bikes to least central nodes
             node = random.randrange(central_count+1, len(central_list)-1)
+            print("NON-CENTRAL-NODE:%s" % node)
             # Add bike to non central station based on random probability range
             if check_station(G, node, bike_count, True):
                 # There was room in destination station
@@ -319,23 +336,31 @@ def am_cycle(G, central_list):
 if __name__ == "__main__":
 
     # Adjustable parameters
-    station_count = 40
+    station_count = 10
     edge_prob = 0.4  # per-edge probability of existing
-    total_bikes = 2000
+    total_bikes = 200
     centre_radius = 1  # radius distance in km which is considered to be city centre
     centre_prob = 0.1  # Probability to add/sub bike from centre locations
-    nsteps = 200  # How many time steps to run
+    nsteps = 20  # How many time steps to run
     centre_flow = 3  # % centrality we want traffic to flow to
-    people = 50  # Number of people using scheme per step
+    people = 20  # Number of people using scheme per run
     api_params = {"contract": "dublin", "apiKey": "52c182bc479e090926da33062b01aba1adc8e18c"}
+    output_file = "bike_share.csv"
+    file = open(output_file, 'wt')
+    try:
+        writer = csv.writer(file)
+        writer.writerow(("Stations", "Bikes", "Steps", "People"))
+        writer.writerow(("Node", "Run", "Total Spaces", "Remaining Spaces", "Full Count", "Empty Count"))
 
-    #G1, people = create_node_graph_from_api(api_params)
-    G2 = create_random_graph(station_count, edge_prob)
+        G1 = create_node_graph_from_api(api_params)
+        G2 = create_random_graph(station_count, edge_prob)
 
-    #print("G1 No. of nodes: %i" % G1.number_of_nodes())
-    #print("G1 No. of edges: %i" % G1.number_of_edges())
-    #print("G2 No. of nodes: %i" % G2.number_of_nodes())
-    #print("G2 No. of edges: %i" % G2.number_of_edges())
+        print("G1 No. of nodes: %i" % G1.number_of_nodes())
+        print("G1 No. of edges: %i" % G1.number_of_edges())
+        print("G2 No. of nodes: %i" % G2.number_of_nodes())
+        print("G2 No. of edges: %i" % G2.number_of_edges())
 
-    #run(G1)
-    run(G2)
+        #run(G1, writer)
+        run(G2, writer)
+    finally:
+        file.close()
