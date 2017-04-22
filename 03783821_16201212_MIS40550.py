@@ -174,20 +174,21 @@ def run(G, csv_file):
         empty_list = [(n, G.node[n]['in_cent'], G.node[n]['empty']) for n in G.nodes() if G.node[n]['empty'] >= 1]
         full_list = [(n, G.node[n]['in_cent'], G.node[n]['full']) for n in G.nodes() if G.node[n]['full'] >= 1]
         # Trucks can move bikes from full stations to less full stations
-        csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
-        #bike_trucks(G, 2, 10, cent_list)
+        #csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
+        #bike_trucks(G, 30, 60, cent_list)
         print("Full Count: %s\nEmpty Count %s" % (empty_list, full_list))
 
         [csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
 
-"""
-Add bikes to one stations. This does not try and find other stations
-It simply checks the chose station an returns true or false depending
-on whether there is space to take the relevant action. If not a separate
-function can find another suitable station or stations to allocate the bike
-"""
-
 def add_bikes(G, stations_list, bike_num, person=True):
+    """
+
+    :param G:
+    :param stations_list:
+    :param bike_num:
+    :param person:
+    :return:
+    """
     for stn in stations_list:
         spaces = G.node[stn[1]]['spaces']
         # Check if all bikes have been redistributed
@@ -261,14 +262,14 @@ def bike_trucks(G, runs, num, central_list):
     num is the number of bikes, in percentage, to move from station, e.g. 10 is 10% and so on
     """
     emptyq = []
-    [heappush(emptyq, (-(graph.node[n]['in_cent']), n)) for n in graph.nodes() if graph.node[n]['full'] >= 1]
+    [heappush(emptyq, (-(G.node[n]['in_cent']), n)) for n in G.nodes() if G.node[n]['full'] >= 1]
     for run in range(runs):
         if len(emptyq) > 0:
             station = heappop(emptyq)
             bikes = (G.node[station[1]]['total']*num)//100
             # pick up bikes from full station
             print("TRUCK: %d, %d, %d" % (station[1], G.node[station[1]]['spaces'], bikes))
-            if check_station(graph, station[1], bikes, False, False):
+            if check_station(G, station[1], bikes, False, False):
                 print("TRUCK COLLECT: %d, %d" % (station[1], G.node[station[1]]['spaces']))
                 # Now move bikes to non central stations
                 add_bikes(G, sorted(central_list, reverse=True), bikes, False)
@@ -339,6 +340,7 @@ def bike_flow(G, central_list, central_count):
 
     print("CENTRAL COUNT %d" % central_count)
     for person in range(people):
+        bike_trucks(G, 100, 60, central_list)
         print("PERSON: %d" % (person))
         [print(x) for x in G.nodes(data=True)]
         print("\n")
@@ -381,7 +383,10 @@ def bike_flow(G, central_list, central_count):
     print(nx.get_node_attributes(G, 'total'))
     print(nx.get_node_attributes(G, 'spaces'))
     print(nx.get_node_attributes(G, 'full'))
+    print(sum([nx.get_node_attributes(G, 'full')[x] for x in nx.get_node_attributes(G, 'full')]))
     print(nx.get_node_attributes(G, 'empty'))
+    print(sum([nx.get_node_attributes(G, 'empty')[x] for x in nx.get_node_attributes(G, 'empty')]))
+
 if __name__ == "__main__":
 
     # Adjustable parameters
@@ -401,16 +406,16 @@ if __name__ == "__main__":
         writer.writerow(("Stations", "Bikes", "Steps", "People"))
         writer.writerow(("Node", "Run", "Total Spaces", "Remaining Spaces", "Full Count", "Empty Count"))
 
-        #G1 = create_node_graph_from_api(api_params)
+        G1 = create_node_graph_from_api(api_params)
         G2 = create_random_graph(station_count, edge_prob)
 
-        #print("G1 No. of nodes: %i" % G1.number_of_nodes())
-        #print("G1 No. of edges: %i" % G1.number_of_edges())
+        print("G1 No. of nodes: %i" % G1[0].number_of_nodes())
+        print("G1 No. of edges: %i" % G1[0].number_of_edges())
 
         print("G2 No. of nodes: %i" % G2.number_of_nodes())
         print("G2 No. of edges: %i" % G2.number_of_edges())
 
-        #run(G1, writer)
-        run(G2, writer)
+        run(G1[0], writer)
+        #run(G2, writer)
     finally:
         file.close()
