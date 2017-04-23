@@ -177,15 +177,15 @@ def run(G, csv_file):
     for i in range(nsteps):
         #print("STEP %d" % (i))
         bike_flow(G, cent_list, centre_num)
-        if i == nsteps - 1 or  i + 1 % 10 == 0:
-            [csv_file.writerow((n, i+1, G.node[n]['in_cent'], G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
-            empty_list = [(n, G.node[n]['in_cent'], G.node[n]['empty']) for n in G.nodes() if G.node[n]['empty'] >= 1]
-            full_list = [(n, G.node[n]['in_cent'], G.node[n]['full']) for n in G.nodes() if G.node[n]['full'] >= 1]
+        #if i == nsteps - 1 or  i + 1 % 10 == 0:
+        [csv_file.writerow((n, G.node[n]['name'], i+1, G.node[n]['in_cent'], G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
+        empty_list = [(n, G.node[n]['in_cent'], G.node[n]['empty']) for n in G.nodes() if G.node[n]['empty'] >= 1]
+        full_list = [(n, G.node[n]['in_cent'], G.node[n]['full']) for n in G.nodes() if G.node[n]['full'] >= 1]
         # Trucks can move bikes from full stations to less full stations
         #csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
         bike_trucks(G, 80, 50, cent_list)
-        print("Full Count: %s\nEmpty Count %s" % (sorted(full_list, key=itemgetter(2), reverse=True),
-                                                  sorted(empty_list, key=itemgetter(2),reverse=True)))
+        #print("Full Count: %s\nEmpty Count %s" % (sorted(full_list, key=itemgetter(2), reverse=True),
+        #                                          sorted(empty_list, key=itemgetter(2),reverse=True)))
 
         #[csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
 
@@ -426,12 +426,12 @@ if __name__ == "__main__":
     centre_flow = 3  # % centrality we want traffic to flow to
     people = 200  # Number of people using scheme per run
     api_params = {"contract": "dublin", "apiKey": "52c182bc479e090926da33062b01aba1adc8e18c"}
-    csv_output_file = "bike_share2.csv"
-    gml_output_file = "bike_share2.graphml"
+    csv_output_file = "bike_share1.csv"
+    gml_output_file = "bike_share1.graphml"
     csv_file = open(csv_output_file, 'wt')
     try:
         writer = csv.writer(csv_file, lineterminator='\n')
-        writer.writerow(("Node", "Run", "In Centrality", "Total Spaces", "Remaining Spaces", "Full Count", "Empty Count"))
+        writer.writerow(("Node", "Name",  "Run", "In Centrality", "Total Spaces", "Remaining Spaces", "Full Count", "Empty Count"))
 
         G1, station_count, people, total_bikes = create_node_graph_from_api(api_params)
         print("G1 No. of nodes: %i" % G1.number_of_nodes())
