@@ -368,7 +368,7 @@ def bike_flow(G, central_list, central_count):
             if check_station(G, node, bike_count, True):
                 # There was room in destination station
                 pass
-            else:
+            else: 
                 print("Node: %s %s:%s EMPTY for %s" % (node, G.node[node]["total"], G.node[node]["spaces"], person))
                 # Random station was empty so start with most central and work through
                 # list to find a station to put the bike in
