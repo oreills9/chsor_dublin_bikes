@@ -353,6 +353,7 @@ def check_station(G, node, change, add=True, person=True):
             G.node[node]['spaces'] += change
             # If truck is moving bikes it does not count
             # Only care if people cannot find a bike
+            print("EMPTYCOUNT")
             if person:
                 if (total - G.node[node]['spaces']) == 0:
                     G.node[node]['empty'] += 1
@@ -398,11 +399,14 @@ def bike_flow(G, central_list, central_count):
                 # from another less central station
                 move_bikes(G, sorted(central_list, reverse=True), bike_count)
 
-
     #print("Total - Spaces - Full - Empty")
     #print(nx.get_node_attributes(G, 'total'))
     #print(nx.get_node_attributes(G, 'spaces'))
     #print(nx.get_node_attributes(G, 'full'))
+    print("Total - Spaces - Full - Empty")
+    print(nx.get_node_attributes(G, 'total'))
+    print(nx.get_node_attributes(G, 'spaces'))
+    print(nx.get_node_attributes(G, 'full'))
     full_count = (sum([nx.get_node_attributes(G, 'full')[x] for x in nx.get_node_attributes(G, 'full')]))
     print("FULL count: %s" % (full_count))
     #print(nx.get_node_attributes(G, 'empty'))
