@@ -10,10 +10,21 @@ import pandas as pd
 from operator import itemgetter
 
 """
-The graph is a closed system representing the flow of Dublin bikes from station to station.
-Information is available at each station for the state of every station in the sytem.
-A station can be either empty or full. If it is full it is assumed to have no free spaces.
-Alternatively, if it is empty it is assumed to have all free spaces and no available bikes.
+The model represents a bike sharing scheme in a modern city.
+Each node in the network is a bike station and can be in one of three states:
+1/ Available
+This means people can take bike from the station or leave a bike at that station
+2/ Full
+The station has no empty spaces since it is full with bikes. People can only
+take bikes from the station
+3/ Empty
+The station has no available bikes and only have spaces to leave bikes.
+Information flows through the system in the form of bikes.
+People only know at each station whether or not it is in one of these states.
+They will then try and go to a nearby station to take or leave a bike
+The model will calculate the in-degree centrality of the network.
+This represents the traffic flow in the network. Traffic flows toward the most
+central nodes in the system.
 """
 
 def create_node_graph_from_api(api_params):
@@ -57,15 +68,17 @@ def create_node_graph_from_api(api_params):
 
 def create_random_graph(num_nodes, edge_prob):
     """
-    Create real world graph or random graph
-    :param num_nodes Number of nodes to be in the graph
-    :param edge_prob Probability that an edge will be created between two nodes
+    Create a Erdos Renyi random graph
+    :param num_nodes: Number of stations in the system
+    :param edge_prob: Probability for edge creation
+    :return: A networkx graph
     """
     return nx.erdos_renyi_graph(num_nodes, edge_prob, directed=True)
 
 def create_edges_for_graph(G):
     """
-    Creates directed edges for all nodes, based on the location of the station to the centre of the graph
+    Creates directed edges for all nodes,
+    based on the location of the station to the centre of the graph
     :param G NetworkX graph
     """
 
@@ -119,21 +132,25 @@ def haversine(long1, lat1, long2, lat2):
 def centrality_list(cent_dict, am=True):
     """
     Return sorted list of desc order of node centrality
-    :param cent_dict Dictionary of degree centralities for the nodes
+    :param cent_dict Dictionary of degree centralities for the nodes in the system
     :am If it is morning time then there are a smaller number of central nodes.
     If not am then it is a larger number of outer nodes which have higher centrality
     """
+    # Check if this is morning traffic
     if am:
+        # then create list which can be sorted based on centrality
         cent = [(b,a) for (a,b) in cent_dict.items()]
     else:
         # Not AM so 1-centrality count and reverse the list
         cent = [(1 - b, a) for (a, b) in cent_dict.items()]
+    # Return a sorted list
     return(sorted(cent, reverse=True))
 
 def get_centre_count(cent_list, cent_ratio, am=True):
     """
-    Get the number of center nodes to use to distribute traffic to.
+    Create a centre grouping based on center ratio.
     The higher the ratio the smaller the number of nodes traffic will flow towards
+    It is from this grouping that we choose which node traffic flows to.
     :param cent_list: list of nodes with in degree centrality
     :param cent_ratio: the ratio we want to apply to calculate the number of nodes
     :param am: time of day, am or pm, default is AM
@@ -151,54 +168,52 @@ def get_centre_count(cent_list, cent_ratio, am=True):
 
 def run(G, csv_file):
     """
-    Main run function which kicks off the simulation
+    Main function which initializes the graph and calls the number of steps
+    Each step will simulate a number of people moving bikes in the system
     :param G NetworkX graph
+    :param csv_file: CSV output file
     """
 
     print("PEOPLE %s" % people)
     # Calculate in-degree centrality to represent flow of bikes to centre
     cent = nx.in_degree_centrality(G)
+
     # Add centrality values to each node
     for u in G.nodes():
         G.node[u]['in_cent'] = cent[u]
 
     # Get order of centrality with most central at start
     cent_list = centrality_list(cent, am=True)
-    #[print(tup) for tup in cent_list]
 
     # Set up each station at start of run
     bikes_init(G)
 
     # Get the number of nodes we want to consider as the centre
     centre_num = get_centre_count(cent_list, centre_flow, am=True)
-    #print(centre_num)
 
     # Run program for number of steps
     for i in range(nsteps):
-        #print("STEP %d" % (i))
         bike_flow(G, cent_list, centre_num)
         #if i == nsteps - 1 or  i + 1 % 10 == 0:
         [csv_file.writerow((n, i+1, G.node[n]['in_cent'], G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
         empty_list = [(n, G.node[n]['in_cent'], G.node[n]['empty']) for n in G.nodes() if G.node[n]['empty'] >= 1]
         full_list = [(n, G.node[n]['in_cent'], G.node[n]['full']) for n in G.nodes() if G.node[n]['full'] >= 1]
         # Trucks can move bikes from full stations to less full stations
-        #csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
         bike_trucks(G, 101, 50, cent_list)
-        #print("Full Count: %s\nEmpty Count %s" % (sorted(full_list, key=itemgetter(2), reverse=True),
-        #                                          sorted(empty_list, key=itemgetter(2),reverse=True)))
 
         #[csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
 
-def add_bikes(G, full_q, bike_num, person=True):
+def add_bikes(G, stn_q, bike_num, person=True):
     """
-    :param G:
-    :param stations_list:
-    :param bike_num:
-    :param person:
-    :return:
+    Add bikes to stations with lowest number of bikes
+    :param G: Network X graph
+    :param stn_q: Priority queue with lowest number of bikes as priority
+    :param bike_num: Number of bikes to move
+    :param person: Flag to indicate this is a person or a truck moving bikes
+    :return: True or False
     """
-    while len(full_q) > 0:
-        stn = heappop(full_q)
+    while len(stn_q) > 0:
+        stn = heappop(stn_q)
         spaces = G.node[stn[1]]['spaces']
         # Check if all bikes have been redistributed
         if bike_num <= 0:
@@ -216,22 +231,23 @@ def add_bikes(G, full_q, bike_num, person=True):
             # Otherwise count it as person that cant add bike
             if person:
                 G.node[stn[1]]['full'] += 1
-            #print("Put some bikes in %s, remaining %s" % (stn[1], bike_num))
         else:
             # There are more spaces than bikes so drop all bike
             # and reset station number
             G.node[stn[1]]['spaces'] -= bike_num
             bike_num = 0
-            #print("Put all bikes in %s:%s, remaining %s" % (stn[1], spaces, bike_num))
     return(False)
 
 def move_bikes(G, stations_list, bike_num, person=True):
     """
-    Function to remove bikes from the clculated station based on its centrality
+    Function to find available spaces to put bikes in.
+    This function will cycle through available stations trying to find
+    spaces to put bike in. If station does not have space then we move
+    what bikes we can and go to next station with remaining bikes
     :param G NetworkX graph
-    :param stations_list
-    :param bike_num
-    :param person
+    :param stations_list - ordered list of stations to cycle through
+    :param bike_num - number of bikes to move
+    :param person - flag to set to identify if this is a person or bike truck
     """
     for stn in stations_list:
         spaces = G.node[stn[1]]['spaces']
@@ -271,8 +287,7 @@ def bike_trucks(G, runs, num, central_list):
     """
     emptyq = []
     fullq = []
-    #[heappush(emptyq, (-(G.node[n]['in_cent']), n)) for n in G.nodes() if G.node[n]['full'] >= 1]
-    # Move bikes from stations if number of bikes available is less than 10% of total
+    # Create priority queue of stations if number of bikes available is less than 10% of total
     [heappush(emptyq, (-(G.node[n]['in_cent']), n)) for n in G.nodes() if G.node[n]['spaces'] <= G.node[n]['total']//10]
     # Create a queue that contains list of stations with least number of bikes as priority
     [heappush(fullq, ((G.node[n]['total']-G.node[n]['spaces']), n)) for n in G.nodes()]
@@ -282,11 +297,8 @@ def bike_trucks(G, runs, num, central_list):
             station = heappop(emptyq)
             bikes = (G.node[station[1]]['total']*num)//100
             # pick up bikes from full station
-            #print("TRUCK: %d, %d, %d" % (station[1], G.node[station[1]]['spaces'], bikes))
             if check_station(G, station[1], bikes, False, False):
-                #print("TRUCK COLLECT: %d, %d, %d" % (station[1], G.node[station[1]]['spaces'], G.node[station[1]]['total']))
-                # Now move bikes to non central stations
-                #add_bikes(G, sorted(central_list, reverse=True), bikes, False)
+                # Now move bikes to  stations with lowest number of available bikes
                 add_bikes(G, fullq, bikes, False)
     return(True)
 
@@ -310,14 +322,21 @@ def bikes_init(G):
 
 def check_station(G, node, change, add=True, person=True):
     """
-    Main run function which kicks off the simulation
-    :param G NetworkX graph
+    Check individual station to see if you can either add/remove bikes
+    This function does not cycle through stations. It simply checks if the
+    chose station can add/remove bike and returns true/false accordingly
+    :param G: Graph used in the simulation
+    :param node: The node representing the station to check for availability
+    :param change: The numer of bikes you want to add/remove
+    :param add: This is a flag to idicate whether you want to add or remove bikes
+    :param person: Flag to indicate whether this is a person trying to add or
+    remove a bike or it is a check by the system itself when redistributing via
+    a truck for example. Don't want to count these as empty situations
+    :return: True or False depending on whether the action was possible at that node
     """
-
     spaces = G.node[node]['spaces']
     total = G.node[node]['total']
     spare_bikes = total - spaces
-    #print("check station spaces: %s, total: %s, station: %s, bikes: %s" % (spaces, total, node, change))
     if add:
         if spaces >= change:
             G.node[node]['spaces'] -= change
@@ -344,40 +363,32 @@ def check_station(G, node, change, add=True, person=True):
 def bike_flow(G, central_list, central_count):
     """
     One flow of number of bikes flow towards central nodes.
-    This is one step to allocate a random number of bikes.
+    This is one step to allocate a random number of bikes to stations.
     Assume in-degree of centrality relates to flow of bikes.
     e.g. in morning this is toward high centrality, but in evening
     towards low centrality outer nodes.
     """
     # Get random number of bikes to move
+    # Set to 1 for now so each step represents one person in the system
     bike_count = 1 #random.randrange(1, 2)
     for person in range(people):
-        #bike_trucks(G, people//3, 50, central_list)
-        #[print(x) for x in G.nodes(data=True)]
-        #print("\n")
         # Bikes flow from less central nodes to more central in-degree nodes
         # We want to have more flow to these nodes i.e. adding bikes
         rand = random.uniform(0.1, 1.0)
-        #print(rand, central_list[central_count][0])
         if rand <= central_list[central_count][0]:
             # Randomly choose from most central stations
-
             node = central_list[random.randrange(0, central_count)][1]
-            #print("NODE:%s" % node)
             # Add bikes to randomly selected station
             if check_station(G, node, bike_count, True):
                 # There was room in destination station
                 pass
             else:
-                #print("Node: %s %s:%s EMPTY for %s" % (node, G.node[node]["total"], G.node[node]["spaces"], person))
                 # Random station was empty so start with most central and work through
                 # list to find a station to put the bike in
                 move_bikes(G, central_list, bike_count)
         else:
             # Randomly add bikes to least central nodes
-
             node = central_list[random.randrange(central_count+1, len(central_list)-1)][1]
-            #print("NON-CENTRAL-NODE:%s" % node)
             # Add bike to non central station based on random probability range
             if check_station(G, node, bike_count, True):
                 # There was room in destination station
@@ -393,26 +404,17 @@ def bike_flow(G, central_list, central_count):
                 # We found station to remove a bike from so can move onto next step
                 break
 
-    #print("Total - Spaces - Full - Empty")
-    #print(nx.get_node_attributes(G, 'total'))
-    #print(nx.get_node_attributes(G, 'spaces'))
-    #print(nx.get_node_attributes(G, 'full'))
+    print("Total - Spaces - Full - Empty")
+    print(nx.get_node_attributes(G, 'total'))
+    print(nx.get_node_attributes(G, 'spaces'))
+    print(nx.get_node_attributes(G, 'full'))
     full_count = (sum([nx.get_node_attributes(G, 'full')[x] for x in nx.get_node_attributes(G, 'full')]))
     print("FULL count: %s" % (full_count))
-    #print(nx.get_node_attributes(G, 'empty'))
     empty_count = (sum([nx.get_node_attributes(G, 'empty')[x] for x in nx.get_node_attributes(G, 'empty')]))
     print("EMPTY count: %s" % (empty_count))
-    #full_ratio = G.number_of_nodes()/full_count
-    #print("FULL RATIO: %s" % (full_ratio))
 
 def write_graph_to_gml(G, file):
     nx.write_graphml(G, file)
-
-def create_stats_from_csv(inf):
-    data = pd.read_csv(inf, skiprows=1)
-    #print(data)
-    #plt.savefig(outf, format="PNG")
-
 
 if __name__ == "__main__":
 
@@ -441,5 +443,3 @@ if __name__ == "__main__":
     finally:
         csv_file.close()
     write_graph_to_gml(G, gml_output_file)
-
-    create_stats_from_csv(csv_output_file)
