@@ -198,8 +198,8 @@ def run(G, csv_file):
         empty_list = [(n, G.node[n]['in_cent'], G.node[n]['empty']) for n in G.nodes() if G.node[n]['empty'] >= 1]
         full_list = [(n, G.node[n]['in_cent'], G.node[n]['full']) for n in G.nodes() if G.node[n]['full'] >= 1]
         # Trucks can move bikes from full stations to less full stations
-        #csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
-        bike_trucks(G, 1, 30, cent_list)
+        bike_trucks(G, 101, 50, cent_list)
+
         #[csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
 
 def add_bikes(G, stn_q, bike_num, person=True):
@@ -399,29 +399,17 @@ def bike_flow(G, central_list, central_count):
                 # from another less central station
                 move_bikes(G, sorted(central_list, reverse=True), bike_count)
 
-    #print("Total - Spaces - Full - Empty")
-    #print(nx.get_node_attributes(G, 'total'))
-    #print(nx.get_node_attributes(G, 'spaces'))
-    #print(nx.get_node_attributes(G, 'full'))
     print("Total - Spaces - Full - Empty")
     print(nx.get_node_attributes(G, 'total'))
     print(nx.get_node_attributes(G, 'spaces'))
     print(nx.get_node_attributes(G, 'full'))
     full_count = (sum([nx.get_node_attributes(G, 'full')[x] for x in nx.get_node_attributes(G, 'full')]))
     print("FULL count: %s" % (full_count))
-    #print(nx.get_node_attributes(G, 'empty'))
     empty_count = (sum([nx.get_node_attributes(G, 'empty')[x] for x in nx.get_node_attributes(G, 'empty')]))
     print("EMPTY count: %s" % (empty_count))
-    #full_ratio = G.number_of_nodes()/full_count
-    #print("FULL RATIO: %s" % (full_ratio))
 
 def write_graph_to_gml(G, file):
     nx.write_graphml(G, file)
-
-def create_stats_from_csv(inf):
-    data = pd.read_csv(inf, skiprows=1)
-    #plt.savefig(outf, format="PNG")
-
 
 if __name__ == "__main__":
 
@@ -450,5 +438,3 @@ if __name__ == "__main__":
     finally:
         csv_file.close()
     write_graph_to_gml(G, gml_output_file)
-
-    create_stats_from_csv(csv_output_file)
