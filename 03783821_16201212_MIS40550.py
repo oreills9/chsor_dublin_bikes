@@ -7,7 +7,6 @@ import numpy as np
 from heapq import heappush, heappop
 import csv
 import pandas as pd
-import matplotlib.pyplot as plt
 from operator import itemgetter
 
 """
@@ -156,6 +155,7 @@ def run(G, csv_file):
     :param G NetworkX graph
     """
 
+    print("PEOPLE %s" % people)
     # Calculate in-degree centrality to represent flow of bikes to centre
     cent = nx.in_degree_centrality(G)
     # Add centrality values to each node
@@ -164,7 +164,7 @@ def run(G, csv_file):
 
     # Get order of centrality with most central at start
     cent_list = centrality_list(cent, am=True)
-    [print(tup) for tup in cent_list]
+    #[print(tup) for tup in cent_list]
 
     # Set up each station at start of run
     bikes_init(G)
@@ -178,14 +178,14 @@ def run(G, csv_file):
         #print("STEP %d" % (i))
         bike_flow(G, cent_list, centre_num)
         #if i == nsteps - 1 or  i + 1 % 10 == 0:
-        [csv_file.writerow((n, G.node[n]['name'], i+1, G.node[n]['in_cent'], G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
+        [csv_file.writerow((n, i+1, G.node[n]['in_cent'], G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
         empty_list = [(n, G.node[n]['in_cent'], G.node[n]['empty']) for n in G.nodes() if G.node[n]['empty'] >= 1]
         full_list = [(n, G.node[n]['in_cent'], G.node[n]['full']) for n in G.nodes() if G.node[n]['full'] >= 1]
         # Trucks can move bikes from full stations to less full stations
         #csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
         bike_trucks(G, 101, 50, cent_list)
-        print("Full Count: %s\nEmpty Count %s" % (sorted(full_list, key=itemgetter(2), reverse=True),
-                                                  sorted(empty_list, key=itemgetter(2),reverse=True)))
+        #print("Full Count: %s\nEmpty Count %s" % (sorted(full_list, key=itemgetter(2), reverse=True),
+        #                                          sorted(empty_list, key=itemgetter(2),reverse=True)))
 
         #[csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
 
@@ -306,7 +306,7 @@ def bikes_init(G):
         # Track how many times someone tried to put a bike in station
         # and there was no room
         G.node[u]["full"] = 0
-    [print(x) for x in G.nodes(data=True)]
+    #[print(x) for x in G.nodes(data=True)]
 
 def check_station(G, node, change, add=True, person=True):
     """
@@ -351,7 +351,6 @@ def bike_flow(G, central_list, central_count):
     """
     # Get random number of bikes to move
     bike_count = 1 #random.randrange(1, 2)
-    print("PEOPLE %s" % people)
     for person in range(people):
         #bike_trucks(G, people//3, 50, central_list)
         #[print(x) for x in G.nodes(data=True)]
@@ -370,7 +369,7 @@ def bike_flow(G, central_list, central_count):
                 # There was room in destination station
                 pass
             else:
-                print("Node: %s %s:%s EMPTY for %s" % (node, G.node[node]["total"], G.node[node]["spaces"], person))
+                #print("Node: %s %s:%s EMPTY for %s" % (node, G.node[node]["total"], G.node[node]["spaces"], person))
                 # Random station was empty so start with most central and work through
                 # list to find a station to put the bike in
                 move_bikes(G, central_list, bike_count)
@@ -394,13 +393,13 @@ def bike_flow(G, central_list, central_count):
                 # We found station to remove a bike from so can move onto next step
                 break
 
-    print("Total - Spaces - Full - Empty")
-    print(nx.get_node_attributes(G, 'total'))
-    print(nx.get_node_attributes(G, 'spaces'))
-    print(nx.get_node_attributes(G, 'full'))
+    #print("Total - Spaces - Full - Empty")
+    #print(nx.get_node_attributes(G, 'total'))
+    #print(nx.get_node_attributes(G, 'spaces'))
+    #print(nx.get_node_attributes(G, 'full'))
     full_count = (sum([nx.get_node_attributes(G, 'full')[x] for x in nx.get_node_attributes(G, 'full')]))
     print("FULL count: %s" % (full_count))
-    print(nx.get_node_attributes(G, 'empty'))
+    #print(nx.get_node_attributes(G, 'empty'))
     empty_count = (sum([nx.get_node_attributes(G, 'empty')[x] for x in nx.get_node_attributes(G, 'empty')]))
     print("EMPTY count: %s" % (empty_count))
     #full_ratio = G.number_of_nodes()/full_count
@@ -411,7 +410,7 @@ def write_graph_to_gml(G, file):
 
 def create_stats_from_csv(inf):
     data = pd.read_csv(inf, skiprows=1)
-    print(data)
+    #print(data)
     #plt.savefig(outf, format="PNG")
 
 
@@ -427,24 +426,20 @@ if __name__ == "__main__":
     centre_flow = 3  # % centrality we want traffic to flow to
     people = 200  # Number of people using scheme per run
     api_params = {"contract": "dublin", "apiKey": "52c182bc479e090926da33062b01aba1adc8e18c"}
-    csv_output_file = "bike_share1.csv"
-    gml_output_file = "bike_share1.graphml"
+    csv_output_file = "bike_share.csv"
+    gml_output_file = "bike_share.graphml"
     csv_file = open(csv_output_file, 'wt')
     try:
         writer = csv.writer(csv_file, lineterminator='\n')
-        writer.writerow(("Node", "Name",  "Run", "In Centrality", "Total Spaces", "Remaining Spaces", "Full Count", "Empty Count"))
+        writer.writerow(("Node", "Run", "In Centrality", "Total Spaces", "Remaining Spaces", "Full Count", "Empty Count"))
 
-        G1, station_count, people, total_bikes = create_node_graph_from_api(api_params)
-        print("G1 No. of nodes: %i" % G1.number_of_nodes())
-        print("G1 No. of edges: %i" % G1.number_of_edges())
-        run(G1, writer)
-
-        #G2 = create_random_graph(station_count, edge_prob)
-        #print("G2 No. of nodes: %i" % G2.number_of_nodes())
-        #print("G2 No. of edges: %i" % G2.number_of_edges())
-        #run(G2, writer)
+        #G, station_count, people, total_bikes = create_node_graph_from_api(api_params)
+        G = create_random_graph(station_count, edge_prob)
+        print("No. of nodes: %i" % G.number_of_nodes())
+        print("No. of edges: %i" % G.number_of_edges())
+        run(G, writer)
     finally:
         csv_file.close()
-    write_graph_to_gml(G1, gml_output_file)
+    write_graph_to_gml(G, gml_output_file)
 
     create_stats_from_csv(csv_output_file)
