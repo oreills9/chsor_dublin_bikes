@@ -184,8 +184,8 @@ def run(G, csv_file):
         # Trucks can move bikes from full stations to less full stations
         #csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
         bike_trucks(G, 101, 50, cent_list)
-        print("Full Count: %s\nEmpty Count %s" % (sorted(full_list, key=itemgetter(2), reverse=True),
-                                                  sorted(empty_list, key=itemgetter(2),reverse=True)))
+        #print("Full Count: %s\nEmpty Count %s" % (sorted(full_list, key=itemgetter(2), reverse=True),
+        #                                          sorted(empty_list, key=itemgetter(2),reverse=True)))
 
         #[csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
 
@@ -310,10 +310,16 @@ def bikes_init(G):
 
 def check_station(G, node, change, add=True, person=True):
     """
-    Main run function which kicks off the simulation
-    :param G NetworkX graph
+    Check individual station to see if you can either add/remove bikes
+    :param G: Graph used in the simulation
+    :param node: The node representing the station to check for availability
+    :param change: The numer of bikes you want to add/remove
+    :param add: This is a flag to idicate whether you want to add or remove bikes
+    :param person: Flag to indicate whether this is a person trying to add or
+    remove a bike or it is a check by the system itself when redistributing via
+    a truck for example. Don't want to count these as empty situations
+    :return: True or False depending on whether the action was possible at that node
     """
-
     spaces = G.node[node]['spaces']
     total = G.node[node]['total']
     spare_bikes = total - spaces
@@ -362,7 +368,6 @@ def bike_flow(G, central_list, central_count):
         #print(rand, central_list[central_count][0])
         if rand <= central_list[central_count][0]:
             # Randomly choose from most central stations
-
             node = central_list[random.randrange(0, central_count)][1]
             #print("NODE:%s" % node)
             # Add bikes to randomly selected station
@@ -393,6 +398,7 @@ def bike_flow(G, central_list, central_count):
             if check_station(G, neigh, bike_count, False):
                 # We found station to remove a bike from so can move onto next step
                 break
+            print("Node: %s %s:%s EMPTY for %s" % (node, G.node[node]["total"], G.node[node]["spaces"], person))
 
     print("Total - Spaces - Full - Empty")
     print(nx.get_node_attributes(G, 'total'))
