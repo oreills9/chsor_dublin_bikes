@@ -66,7 +66,7 @@ def create_random_graph(num_nodes, edge_prob):
 
 def create_edges_for_graph(G):
     """
-    Creates directed edges for all nodes, based on the lcation of the station to the centre of the graph
+    Creates directed edges for all nodes, based on the location of the station to the centre of the graph
     :param G NetworkX graph
     """
 
@@ -89,7 +89,8 @@ def create_edges_for_graph(G):
 
 def calculate_centre_point(longs, lats):
     """
-    Function to calculate the centre point of the physical graph, based on the latitude and longitude values of the station locations
+    Function to calculate the centre point of the physical graph,
+    based on the latitude and longitude values of the station locations
     :param lats Latitude values
     :param longs Longitude values
     """
