@@ -183,7 +183,7 @@ def run(G, csv_file):
         full_list = [(n, G.node[n]['in_cent'], G.node[n]['full']) for n in G.nodes() if G.node[n]['full'] >= 1]
         # Trucks can move bikes from full stations to less full stations
         #csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
-        #bike_trucks(G, 100, 50, cent_list)
+        bike_trucks(G, 1, 30, cent_list)
         #print("Full Count: %s\nEmpty Count %s" % (sorted(full_list, key=itemgetter(2), reverse=True),
         #                                          sorted(empty_list, key=itemgetter(2),reverse=True)))
 
@@ -341,7 +341,6 @@ def check_station(G, node, change, add=True, person=True):
             G.node[node]['spaces'] += change
             # If truck is moving bikes it does not count
             # Only care if people cannot find a bike
-            print("EMPTYCOUNT")
             if person:
                 if (total - G.node[node]['spaces']) == 0:
                     G.node[node]['empty'] += 1
@@ -360,7 +359,6 @@ def bike_flow(G, central_list, central_count):
     # Get random number of bikes to move
     bike_count = 1 #random.randrange(1, 2)
     for person in range(people):
-        #bike_trucks(G, people//3, 50, central_list)
         #[print(x) for x in G.nodes(data=True)]
         #print("\n")
         # Bikes flow from less central nodes to more central in-degree nodes
