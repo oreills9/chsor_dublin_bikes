@@ -364,7 +364,7 @@ def check_station(G, node, change, add=True, person=True):
 def bike_flow(G, central_list, central_count):
     """
     One flow of number of bikes flow towards central nodes.
-    This is one step to allocate a random number of bikes.
+    This is one step to allocate a random number of bikes to stations.
     Assume in-degree of centrality relates to flow of bikes.
     e.g. in morning this is toward high centrality, but in evening
     towards low centrality outer nodes.
