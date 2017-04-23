@@ -177,12 +177,12 @@ def run(G, csv_file):
     for i in range(nsteps):
         #print("STEP %d" % (i))
         bike_flow(G, cent_list, centre_num)
-        [csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
+        #[csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
         empty_list = [(n, G.node[n]['in_cent'], G.node[n]['empty']) for n in G.nodes() if G.node[n]['empty'] >= 1]
         full_list = [(n, G.node[n]['in_cent'], G.node[n]['full']) for n in G.nodes() if G.node[n]['full'] >= 1]
         # Trucks can move bikes from full stations to less full stations
-        csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
-        #bike_trucks(G, 30, 25, cent_list)
+        #csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
+        bike_trucks(G, 80, 50, cent_list)
         print("Full Count: %s\nEmpty Count %s" % (sorted(full_list, key=itemgetter(2), reverse=True),
                                                   sorted(empty_list, key=itemgetter(2),reverse=True)))
 
@@ -224,7 +224,7 @@ def add_bikes(G, full_q, bike_num, person=True):
             print("Put all bikes in %s:%s, remaining %s" % (stn[1], spaces, bike_num))
     return(False)
 
-def remove_bikes(G, stations_list, bike_num, person=True):
+def move_bikes(G, stations_list, bike_num, person=True):
     """
     Function to remove bikes from the clculated station based on its centrality
     :param G NetworkX graph
@@ -235,31 +235,30 @@ def remove_bikes(G, stations_list, bike_num, person=True):
 
     for stn in stations_list:
         spaces = G.node[stn[1]]['spaces']
-        total = G.node[stn[1]]['total']
-        spare_bikes = total - spaces
-        # Check is all bikes have been redistributed
+        # Check if all bikes have been redistributed
         if bike_num <= 0:
-            return(True)
-        if spare_bikes == 0:
-            # Then there are no bikes, station is empty
+            return (True)
+        if spaces == 0:
+            # No space so just go to next station
             continue
-        elif spare_bikes <= bike_num:
-            # This means there are some bikes available
-            # so take some bikes and move to next station
-            bike_num -= spare_bikes
-            # Reset station spaces
-            G.node[stn[1]]['spaces'] += spare_bikes
-            #print("Removed some bikes in %s, remaining %s" % (stn[1], bike_num))
-            # If truck is moving bikes it does not count
-            # Only care is people cannot find a bike
+        elif spaces <= bike_num:
+            # If there are some space drop some bikes and
+            # go to next station with remaining bikes
+            bike_num -= spaces
+            # There are no spaces now so set this to zero
+            G.node[stn[1]]['spaces'] = 0
+            # If this is a truck moving bikes then ignore
+            # Otherwise count it as person that cant add bike
             if person:
-                G.node[stn[1]]['empty']+=1
+                G.node[stn[1]]['full'] += 1
+            print("Put some bikes in %s, remaining %s" % (stn[1], bike_num))
         else:
-            # There are more spare bikes than we need so
-            # we can take all bikes from this station
-            G.node[stn[1]]['spaces'] += bike_num
+            # There are more spaces than bikes so drop all bike
+            # and reset station number
+            G.node[stn[1]]['spaces'] -= bike_num
             bike_num = 0
-            #print("Removed all bikes in %s, remaining %s" % (stn[1], bike_num))
+            print("Put all bikes in %s:%s, remaining %s" % (stn[1], spaces, bike_num))
+    return (False)
 
 def bike_trucks(G, runs, num, central_list):
     """
@@ -354,7 +353,7 @@ def bike_flow(G, central_list, central_count):
     bike_count = random.randrange(1, 2)
 
     for person in range(people):
-        bike_trucks(G, 4, 50, central_list)
+        #bike_trucks(G, people//3, 50, central_list)
         #[print(x) for x in G.nodes(data=True)]
         #print("\n")
         # Bikes flow from less central nodes to more central in-degree nodes
@@ -372,9 +371,10 @@ def bike_flow(G, central_list, central_count):
             else:
                 # Random station was empty so start with most central and work through
                 # list to find a station to put the bike in
-                add_bikes(G, central_list, bike_count)
+                move_bikes(G, central_list, bike_count)
         else:
             # Randomly add bikes to least central nodes
+            print("RAND %d, %d" % (central_count+1, len(central_list)-1))
             node = random.randrange(central_count+1, len(central_list)-1)
             #print("NON-CENTRAL-NODE:%s" % node)
             # Add bike to non central station based on random probability range
@@ -424,7 +424,7 @@ if __name__ == "__main__":
     centre_prob = 0.1  # Probability to add/sub bike from centre locations
     nsteps = 20  # How many time steps to run
     centre_flow = 3  # % centrality we want traffic to flow to
-    people = 20  # Number of people using scheme per run
+    people = 200  # Number of people using scheme per run
     api_params = {"contract": "dublin", "apiKey": "52c182bc479e090926da33062b01aba1adc8e18c"}
     csv_output_file = "bike_share2.csv"
     gml_output_file = "bike_share2.graphml"
@@ -433,15 +433,15 @@ if __name__ == "__main__":
         writer = csv.writer(csv_file, lineterminator='\n')
         writer.writerow(("Node", "Run", "Total Spaces", "Remaining Spaces", "Full Count", "Empty Count"))
 
-        #G1, station_count, people, total_bikes = create_node_graph_from_api(api_params)
-        #print("G1 No. of nodes: %i" % G1.number_of_nodes())
-        #print("G1 No. of edges: %i" % G1.number_of_edges())
-        #run(G1, writer)
+        G1, station_count, people, total_bikes = create_node_graph_from_api(api_params)
+        print("G1 No. of nodes: %i" % G1.number_of_nodes())
+        print("G1 No. of edges: %i" % G1.number_of_edges())
+        run(G1, writer)
 
-        G2 = create_random_graph(station_count, edge_prob)
-        print("G2 No. of nodes: %i" % G2.number_of_nodes())
-        print("G2 No. of edges: %i" % G2.number_of_edges())
-        run(G2, writer)
+        #G2 = create_random_graph(station_count, edge_prob)
+        #print("G2 No. of nodes: %i" % G2.number_of_nodes())
+        #print("G2 No. of edges: %i" % G2.number_of_edges())
+        #run(G2, writer)
     finally:
         csv_file.close()
     #write_graph_to_gml(G1, gml_output_file)
