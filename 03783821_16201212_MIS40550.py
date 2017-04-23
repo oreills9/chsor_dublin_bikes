@@ -163,29 +163,29 @@ def run(G, csv_file):
 
     # Get order of centrality with most central at start
     cent_list =  centrality_list(cent, am=True)
-    [print(tup) for tup in cent_list]
+    #[print(tup) for tup in cent_list]
 
     # Set up each station at start of run
     bikes_init(G)
 
     # Get the number of nodes we want to consider as the centre
     centre_num = get_centre_count(cent_list, centre_flow, am=True)
-    print(centre_num)
+    #print(centre_num)
 
     # Run program for number of steps
     for i in range(nsteps):
         #print("STEP %d" % (i))
         bike_flow(G, cent_list, centre_num)
-        [csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
-        empty_list = [(n, G.node[n]['in_cent'], G.node[n]['empty']) for n in G.nodes() if G.node[n]['empty'] >= 1]
-        full_list = [(n, G.node[n]['in_cent'], G.node[n]['full']) for n in G.nodes() if G.node[n]['full'] >= 1]
+        if i == nsteps - 1 or  i + 1 % 10 == 0:
+            [csv_file.writerow((n, i+1, G.node[n]['in_cent'], G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
+            empty_list = [(n, G.node[n]['in_cent'], G.node[n]['empty']) for n in G.nodes() if G.node[n]['empty'] >= 1]
+            full_list = [(n, G.node[n]['in_cent'], G.node[n]['full']) for n in G.nodes() if G.node[n]['full'] >= 1]
         # Trucks can move bikes from full stations to less full stations
-        csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
+        #csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
         #bike_trucks(G, 30, 25, cent_list)
-        print("Full Count: %s\nEmpty Count %s" % (sorted(full_list, key=itemgetter(2), reverse=True),
-                                                  sorted(empty_list, key=itemgetter(2),reverse=True)))
+        #print("Full Count: %s\nEmpty Count %s" % (sorted(full_list, key=itemgetter(2), reverse=True), sorted(empty_list, key=itemgetter(2),reverse=True)))
 
-        [csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
+        #[csv_file.writerow((n, i+1, G.node[n]['total'], G.node[n]['spaces'], G.node[n]['full'], G.node[n]['empty'])) for n in G.nodes()]
 
 def add_bikes(G, full_q, bike_num, person=True):
     """
@@ -214,13 +214,13 @@ def add_bikes(G, full_q, bike_num, person=True):
             # Otherwise count it as person that cant add bike
             if person:
                 G.node[stn[1]]['full'] += 1
-            print("Put some bikes in %s, remaining %s" % (stn[1], bike_num))
+            #print("Put some bikes in %s, remaining %s" % (stn[1], bike_num))
         else:
             # There are more spaces than bikes so drop all bike
             # and reset station number
             G.node[stn[1]]['spaces'] -= bike_num
             bike_num = 0
-            print("Put all bikes in %s:%s, remaining %s" % (stn[1], spaces, bike_num))
+            #print("Put all bikes in %s:%s, remaining %s" % (stn[1], spaces, bike_num))
     return(False)
 
 def remove_bikes(G, stations_list, bike_num, person=True):
@@ -276,15 +276,15 @@ def bike_trucks(G, runs, num, central_list):
     [heappush(emptyq, (-(G.node[n]['in_cent']), n)) for n in G.nodes() if G.node[n]['spaces'] <= G.node[n]['total']//10]
     # Create a queue that contains list of stations with least number of bikes as priority
     [heappush(fullq, ((G.node[n]['total']-G.node[n]['spaces']), n)) for n in G.nodes()]
-    print("FULLQ %s" % (fullq))
+    #print("FULLQ %s" % (fullq))
     for run in range(runs):
         if len(emptyq) > 0:
             station = heappop(emptyq)
             bikes = (G.node[station[1]]['total']*num)//100
             # pick up bikes from full station
-            print("TRUCK: %d, %d, %d" % (station[1], G.node[station[1]]['spaces'], bikes))
+            #print("TRUCK: %d, %d, %d" % (station[1], G.node[station[1]]['spaces'], bikes))
             if check_station(G, station[1], bikes, False, False):
-                print("TRUCK COLLECT: %d, %d, %d" % (station[1], G.node[station[1]]['spaces'], G.node[station[1]]['total']))
+                #print("TRUCK COLLECT: %d, %d, %d" % (station[1], G.node[station[1]]['spaces'], G.node[station[1]]['total']))
                 # Now move bikes to non central stations
                 #add_bikes(G, sorted(central_list, reverse=True), bikes, False)
                 add_bikes(G, fullq, bikes, False)
@@ -352,8 +352,10 @@ def bike_flow(G, central_list, central_count):
     # Get random number of bikes to move
     bike_count = random.randrange(1, 2)
 
+
     for person in range(people):
-        bike_trucks(G, 4, 50, central_list)
+        bike_trucks(G, station_count // 5, 50, central_list)
+
         #[print(x) for x in G.nodes(data=True)]
         #print("\n")
         # Bikes flow from less central nodes to more central in-degree nodes
@@ -396,25 +398,23 @@ def bike_flow(G, central_list, central_count):
     print(nx.get_node_attributes(G, 'spaces'))
     print(nx.get_node_attributes(G, 'full'))
     full_count = (sum([nx.get_node_attributes(G, 'full')[x] for x in nx.get_node_attributes(G, 'full')]))
-    print("FULL count: %s" % (full_count))
+    #print("FULL count: %s" % (full_count))
     print(nx.get_node_attributes(G, 'empty'))
     empty_count = (sum([nx.get_node_attributes(G, 'empty')[x] for x in nx.get_node_attributes(G, 'empty')]))
-    print("EMPTY count: %s" % (empty_count))
+    #print("EMPTY count: %s" % (empty_count))
     #full_ratio = G.number_of_nodes()/full_count
     #print("FULL RATIO: %s" % (full_ratio))
 
 def write_graph_to_gml(G, file):
     nx.write_graphml(G, file)
-def plot_nx_graph(G):
-    nx.draw(G)
-def plot_graph_from_csv(inf, outf):
-    return
-    #data = pd.read_csv(inf, skiprows=1)
+
+def create_stats_from_csv(inf):
+    data = pd.read_csv(inf, skiprows=1)
+    print(data)
     #plt.savefig(outf, format="PNG")
 
 
 if __name__ == "__main__":
-
     # Adjustable parameters
     station_count = 10
     edge_prob = 0.4  # per-edge probability of existing
@@ -430,7 +430,7 @@ if __name__ == "__main__":
     csv_file = open(csv_output_file, 'wt')
     try:
         writer = csv.writer(csv_file, lineterminator='\n')
-        writer.writerow(("Node", "Run", "Total Spaces", "Remaining Spaces", "Full Count", "Empty Count"))
+        writer.writerow(("Node", "Run", "In Centrality", "Total Spaces", "Remaining Spaces", "Full Count", "Empty Count"))
 
         #G1, station_count, people, total_bikes = create_node_graph_from_api(api_params)
         #print("G1 No. of nodes: %i" % G1.number_of_nodes())
@@ -443,6 +443,6 @@ if __name__ == "__main__":
         run(G2, writer)
     finally:
         csv_file.close()
-    #write_graph_to_gml(G1, gml_output_file)
-    #plot_nx_graph(G1)
-    #plot_graph_from_csv(csv_output_file)
+    write_graph_to_gml(G2, gml_output_file)
+
+    create_stats_from_csv(csv_output_file)
