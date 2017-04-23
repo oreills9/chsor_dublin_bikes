@@ -350,7 +350,7 @@ def bike_flow(G, central_list, central_count):
     towards low centrality outer nodes.
     """
     # Get random number of bikes to move
-    bike_count = random.randrange(1, 2)
+    bike_count = 1 #random.randrange(1, 2)
     print("PEOPLE %s" % people)
     for person in range(people):
         #bike_trucks(G, people//3, 50, central_list)
@@ -362,7 +362,8 @@ def bike_flow(G, central_list, central_count):
         #print(rand, central_list[central_count][0])
         if rand <= central_list[central_count][0]:
             # Randomly choose from most central stations
-            node = random.randrange(0, central_count)
+
+            node = central_list[random.randrange(0, central_count)][1]
             #print("NODE:%s" % node)
             # Add bikes to randomly selected station
             if check_station(G, node, bike_count, True):
@@ -376,7 +377,7 @@ def bike_flow(G, central_list, central_count):
         else:
             # Randomly add bikes to least central nodes
 
-            node = random.randrange(central_count+1, len(central_list)-1)
+            node = central_list[random.randrange(central_count+1, len(central_list)-1)][1]
             #print("NON-CENTRAL-NODE:%s" % node)
             # Add bike to non central station based on random probability range
             if check_station(G, node, bike_count, True):
