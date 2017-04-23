@@ -174,7 +174,6 @@ def run(G, csv_file):
     :param csv_file: CSV output file
     """
 
-    print("PEOPLE %s" % people)
     # Calculate in-degree centrality to represent flow of bikes to centre
     cent = nx.in_degree_centrality(G)
 
@@ -263,6 +262,7 @@ def move_bikes(G, stations_list, bike_num, person=True):
             bike_num -= spaces
             # There are no spaces now so set this to zero
             G.node[stn[1]]['spaces'] = 0
+            G.node[stn[1]]['empty'] += 1
             # If this is a truck moving bikes then ignore
             # Otherwise count it as person that cant add bike
             if person:
@@ -353,6 +353,7 @@ def check_station(G, node, change, add=True, person=True):
             G.node[node]['spaces'] += change
             # If truck is moving bikes it does not count
             # Only care if people cannot find a bike
+            print("EMPTYCOUNT")
             if person:
                 if (total - G.node[node]['spaces']) == 0:
                     G.node[node]['empty'] += 1
@@ -393,16 +394,10 @@ def bike_flow(G, central_list, central_count):
             if check_station(G, node, bike_count, True):
                 # There was room in destination station
                 pass
-        # This is a closed system so need to remove corresponding bikes
-        # from another less central station
-        for neigh in G.neighbors(node):
-            # Need to remove same bike count from other nodes
-            # Since this is assumed to be a fully connected graph
-            # And a closed system for counts, then one of the neighbours
-            # will have to have space for these bikes.
-            if check_station(G, neigh, bike_count, False):
-                # We found station to remove a bike from so can move onto next step
-                break
+            else:
+                # This is a closed system so need to remove corresponding bikes
+                # from another less central station
+                move_bikes(G, sorted(central_list, reverse=True), bike_count)
 
     print("Total - Spaces - Full - Empty")
     print(nx.get_node_attributes(G, 'total'))
