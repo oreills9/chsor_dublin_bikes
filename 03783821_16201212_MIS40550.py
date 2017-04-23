@@ -163,8 +163,8 @@ def run(G, csv_file):
         G.node[u]['in_cent'] = cent[u]
 
     # Get order of centrality with most central at start
-    cent_list =  centrality_list(cent, am=True)
-    #[print(tup) for tup in cent_list]
+    cent_list = centrality_list(cent, am=True)
+    [print(tup) for tup in cent_list]
 
     # Set up each station at start of run
     bikes_init(G)
@@ -183,7 +183,7 @@ def run(G, csv_file):
             full_list = [(n, G.node[n]['in_cent'], G.node[n]['full']) for n in G.nodes() if G.node[n]['full'] >= 1]
         # Trucks can move bikes from full stations to less full stations
         #csv_file.writerow((["REDISTRIBUTE VIA TRUCKS"]))
-        bike_trucks(G, 80, 50, cent_list)
+        bike_trucks(G, 101, 50, cent_list)
         print("Full Count: %s\nEmpty Count %s" % (sorted(full_list, key=itemgetter(2), reverse=True),
                                                   sorted(empty_list, key=itemgetter(2),reverse=True)))
 
@@ -233,7 +233,6 @@ def move_bikes(G, stations_list, bike_num, person=True):
     :param bike_num
     :param person
     """
-
     for stn in stations_list:
         spaces = G.node[stn[1]]['spaces']
         # Check if all bikes have been redistributed
@@ -252,13 +251,13 @@ def move_bikes(G, stations_list, bike_num, person=True):
             # Otherwise count it as person that cant add bike
             if person:
                 G.node[stn[1]]['full'] += 1
-            print("Put some bikes in %s, remaining %s" % (stn[1], bike_num))
+            #print("Put some bikes in %s, remaining %s" % (stn[1], bike_num))
         else:
             # There are more spaces than bikes so drop all bike
             # and reset station number
             G.node[stn[1]]['spaces'] -= bike_num
             bike_num = 0
-            print("Put all bikes in %s:%s, remaining %s" % (stn[1], spaces, bike_num))
+            #print("Put all bikes in %s:%s, remaining %s" % (stn[1], spaces, bike_num))
     return (False)
 
 def bike_trucks(G, runs, num, central_list):
@@ -277,7 +276,7 @@ def bike_trucks(G, runs, num, central_list):
     [heappush(emptyq, (-(G.node[n]['in_cent']), n)) for n in G.nodes() if G.node[n]['spaces'] <= G.node[n]['total']//10]
     # Create a queue that contains list of stations with least number of bikes as priority
     [heappush(fullq, ((G.node[n]['total']-G.node[n]['spaces']), n)) for n in G.nodes()]
-    #print("FULLQ %s" % (fullq))
+
     for run in range(runs):
         if len(emptyq) > 0:
             station = heappop(emptyq)
@@ -300,14 +299,14 @@ def bikes_init(G):
     for u in G.nodes():
         if "total" not in G.node[u]: # Check if total is populated already
             G.node[u]["total"] = int(10*G.node[u]['in_cent'])*10
-        if "spaces" not in G.node[u]:# Check if spaces is populated already
-            G.node[u]["spaces"] = int(G.node[u]["total"]/2)
+        G.node[u]["spaces"] = int(G.node[u]["total"]/2)
         # Track how many times someone tried to take bike from station
         # and it was not available
         G.node[u]["empty"] = 0
         # Track how many times someone tried to put a bike in station
         # and there was no room
         G.node[u]["full"] = 0
+    [print(x) for x in G.nodes(data=True)]
 
 def check_station(G, node, change, add=True, person=True):
     """
@@ -352,14 +351,14 @@ def bike_flow(G, central_list, central_count):
     """
     # Get random number of bikes to move
     bike_count = random.randrange(1, 2)
-
+    print("PEOPLE %s" % people)
     for person in range(people):
         #bike_trucks(G, people//3, 50, central_list)
         #[print(x) for x in G.nodes(data=True)]
         #print("\n")
         # Bikes flow from less central nodes to more central in-degree nodes
         # We want to have more flow to these nodes i.e. adding bikes
-        rand = random.uniform(0.1, 0.99)
+        rand = random.uniform(0.1, 1.0)
         #print(rand, central_list[central_count][0])
         if rand <= central_list[central_count][0]:
             # Randomly choose from most central stations
@@ -369,13 +368,14 @@ def bike_flow(G, central_list, central_count):
             if check_station(G, node, bike_count, True):
                 # There was room in destination station
                 pass
-            else:
+            else: 
+                print("Node: %s %s:%s EMPTY for %s" % (node, G.node[node]["total"], G.node[node]["spaces"], person))
                 # Random station was empty so start with most central and work through
                 # list to find a station to put the bike in
                 move_bikes(G, central_list, bike_count)
         else:
             # Randomly add bikes to least central nodes
-            #print("RAND %d, %d" % (central_count+1, len(central_list)-1))
+
             node = random.randrange(central_count+1, len(central_list)-1)
             #print("NON-CENTRAL-NODE:%s" % node)
             # Add bike to non central station based on random probability range
